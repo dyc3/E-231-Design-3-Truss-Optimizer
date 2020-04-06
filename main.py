@@ -2,6 +2,14 @@
 import matplotlib
 import matplotlib.pyplot as plt
 
+# trusses must span 15 inches, and there must be a connection at the top center of the truss
+
+# extra credit: +2
+# holds 320 lbs, less than 60 in
+
+# extra credit: +2
+# 6:1 strength to weight ratio
+
 class Truss:
 	def __init__(self):
 		# format:
@@ -14,6 +22,9 @@ class Truss:
 		for line in lines:
 			plt.plot([line[0][0], line[1][0]], [line[0][1], line[1][1]])
 		plt.show()
+
+	def is_valid(self):
+		return len(self.members) >=  2 * len(self.nodes) - 3
 
 test_truss = Truss()
 test_truss.nodes = [
@@ -30,8 +41,5 @@ test_truss.members = [
 	[2, 3],
 ]
 
-# trusses must span 15 inches, and there must be a connection at the top center of the truss
-def is_valid(truss):
-	pass
-
+print("is_valid", test_truss.is_valid())
 test_truss.draw()

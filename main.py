@@ -82,7 +82,7 @@ def generate_truss():
 	width = MIN_WIDTH
 	height = MAX_HEIGHT
 	subdivide_mode = random.choice(["triangle_subdivide", "radial_subdivide", "pillar_subdivide"])
-	subdivide_mode = "radial_subdivide"
+	subdivide_mode = "pillar_subdivide"
 	if subdivide_mode == "triangle_subdivide":
 		subdivides = random.randint(1, 3)
 		triangles = [
@@ -140,6 +140,39 @@ def generate_truss():
 				[top_points[i - 1], top_points[i]]
 			]
 		lines += top_lines
+		for line in lines:
+			ss.add_truss_element(location=line)
+	elif subdivide_mode == "pillar_subdivide":
+		subdivides = random.randint(1, 4)
+		subdivides = 4
+		step_size = width / 2 / subdivides
+		lines = []
+		for x in np.arange(step_size, width, step_size):
+			lines += [
+				[[x, 0], [x, valmap(x, 0, width / 2, 0, height) if x <= width / 2 else valmap(x, width / 2, width, height, 0)]],
+			]
+		top_points = [p[1] for p in lines]
+		edge_lines = []
+		for i in range(1, len(top_points)):
+			edge_lines += [
+				[top_points[i - 1], top_points[i]],
+				[[top_points[i - 1][0], 0], [top_points[i][0], 0]],
+			]
+			if i < len(top_points) / 2:
+				edge_lines += [
+					[[top_points[i - 1][0], 0], top_points[i]],
+				]
+			else:
+				edge_lines += [
+					[top_points[i - 1], [top_points[i][0], 0]],
+				]
+		lines += [
+			[[0, 0], top_points[0]],
+			[[0, 0], [top_points[i][0], 0]],
+			[[width, 0], top_points[-1]],
+			[[width, 0], [top_points[-1][0], 0]],
+		]
+		lines += edge_lines
 		for line in lines:
 			ss.add_truss_element(location=line)
 

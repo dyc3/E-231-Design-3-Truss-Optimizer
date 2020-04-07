@@ -5,6 +5,7 @@ import math
 from anastruct import SystemElements
 import random
 import copy
+import numpy as np
 
 # trusses must span 15 inches, and there must be a connection at the top center of the truss
 # member length must not exceed 72 inches, as 2 lengths of 36 inches
@@ -23,6 +24,9 @@ def dist(a, b):
 
 def midpoint(a, b):
     return [(a[0]+b[0])/2, (a[1]+b[1])/2]
+
+def valmap(value, istart, istop, ostart, ostop):
+	return ostart + (ostop - ostart) * ((value - istart) / (istop - istart))
 
 class Truss:
 	def __init__(self):
@@ -77,11 +81,8 @@ def generate_truss():
 	ss = SystemElements(EA=15000, EI=5000)
 	width = MIN_WIDTH
 	height = MAX_HEIGHT
-	# ss.add_truss_element(location=[[0, 0], [width, 0]])
-	# ss.add_truss_element(location=[[0, 0], [width/2, height]])
-	# ss.add_truss_element(location=[[width, 0], [width/2, height]])
 	subdivide_mode = random.choice(["triangle_subdivide", "radial_subdivide", "pillar_subdivide"])
-	subdivide_mode = "triangle_subdivide"
+	subdivide_mode = "radial_subdivide"
 	if subdivide_mode == "triangle_subdivide":
 		subdivides = random.randint(1, 3)
 		triangles = [
@@ -91,9 +92,6 @@ def generate_truss():
 				[[width/2, height], [0, 0]],
 			],
 		]
-		# lines = copy.deepcopy(base_lines)
-		# for line in lines:
-		# 	ss.add_truss_element(location=line)
 		for _ in range(subdivides):
 			new_triangles = []
 			for triangle in triangles:
@@ -125,6 +123,25 @@ def generate_truss():
 		for triangle in triangles:
 			for line in triangle:
 				ss.add_truss_element(location=line)
+	elif subdivide_mode == "radial_subdivide":
+		subdivides = random.randint(1, 4)
+		step_size = width / 2 / subdivides
+		bottom_midpoint = midpoint([0, 0], [width, 0])
+		lines = []
+		for x in np.arange(0, width + 0.1, step_size):
+			lines += [
+				[bottom_midpoint, [x, valmap(x, 0, width / 2, 0, height) if x <= width / 2 else valmap(x, width / 2, width, height, 0)]],
+			]
+		lines[-1][1][1] = 0 # HACK: set last y value to 0
+		top_points = [p[1] for p in lines]
+		top_lines = []
+		for i in range(1, len(top_points)):
+			top_lines += [
+				[top_points[i - 1], top_points[i]]
+			]
+		lines += top_lines
+		for line in lines:
+			ss.add_truss_element(location=line)
 
 	# ss.add_support_fixed(node_id=ss.find_node_id(vertex=[0, 0]))
 	# ss.add_support_fixed(node_id=ss.find_node_id(vertex=[width, 0]))

@@ -40,6 +40,7 @@ class Truss:
 		return total_width >= 15 and total_height <= 4 and total_length <= 72 and len(self.members) >=  2 * len(self.nodes) - 3
 
 	def calculate_member_forces(self):
+		top_most_idx = self.nodes.index(max(self.nodes, key=lambda p: p[1])) # load will be placed on this node
 		pass
 
 test_truss = Truss()

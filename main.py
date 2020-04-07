@@ -39,6 +39,9 @@ class Truss:
 		total_length = sum([dist(*line) for line in lines])
 		return total_width >= 15 and total_height <= 4 and total_length <= 72 and len(self.members) >=  2 * len(self.nodes) - 3
 
+	def calculate_member_forces(self):
+		pass
+
 test_truss = Truss()
 test_truss.nodes = [
 	(0, 0),

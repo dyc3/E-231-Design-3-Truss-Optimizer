@@ -166,7 +166,7 @@ def generate_truss():
 				]
 		lines += [
 			[[0, 0], top_points[0]],
-			[[0, 0], [top_points[i][0], 0]],
+			[[0, 0], [top_points[0][0], 0]],
 			[[width, 0], top_points[-1]],
 			[[width, 0], [top_points[-1][0], 0]],
 		]
@@ -178,4 +178,13 @@ def generate_truss():
 	ss.add_support_fixed(node_id=ss.find_node_id(vertex=[width, 0]))
 	return ss
 
-generate_truss().show_structure()
+ss = generate_truss()
+ss.point_load(Fy=-300, node_id=ss.find_node_id(vertex=[15/2, 4]))
+ss.solve()
+
+ss.show_structure()
+ss.show_reaction_force()
+ss.show_axial_force()
+ss.show_shear_force()
+ss.show_bending_moment()
+ss.show_displacement()

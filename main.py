@@ -82,7 +82,6 @@ def generate_truss():
 	width = MIN_WIDTH
 	height = MAX_HEIGHT
 	subdivide_mode = random.choice(["triangle_subdivide", "radial_subdivide", "pillar_subdivide"])
-	subdivide_mode = "pillar_subdivide"
 	if subdivide_mode == "triangle_subdivide":
 		subdivides = random.randint(1, 3)
 		triangles = [
@@ -144,7 +143,6 @@ def generate_truss():
 			ss.add_truss_element(location=line)
 	elif subdivide_mode == "pillar_subdivide":
 		subdivides = random.randint(1, 4)
-		subdivides = 4
 		step_size = width / 2 / subdivides
 		lines = []
 		for x in np.arange(step_size, width, step_size):
@@ -176,8 +174,8 @@ def generate_truss():
 		for line in lines:
 			ss.add_truss_element(location=line)
 
-	# ss.add_support_fixed(node_id=ss.find_node_id(vertex=[0, 0]))
-	# ss.add_support_fixed(node_id=ss.find_node_id(vertex=[width, 0]))
+	ss.add_support_fixed(node_id=ss.find_node_id(vertex=[0, 0]))
+	ss.add_support_fixed(node_id=ss.find_node_id(vertex=[width, 0]))
 	return ss
 
 generate_truss().show_structure()

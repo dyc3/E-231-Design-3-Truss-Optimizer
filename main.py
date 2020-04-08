@@ -28,6 +28,9 @@ def midpoint(a, b):
 def valmap(value, istart, istop, ostart, ostop):
 	return ostart + (ostop - ostart) * ((value - istart) / (istop - istart))
 
+def lbsToN(lbs):
+	return lbs * 4.4482216282509
+
 class Truss:
 	def __init__(self):
 		# format:
@@ -83,7 +86,7 @@ def generate_truss():
 	height = MAX_HEIGHT
 	subdivide_mode = random.choice(["triangle_subdivide", "radial_subdivide", "pillar_subdivide"])
 	if subdivide_mode == "triangle_subdivide":
-		subdivides = random.randint(1, 3)
+		subdivides = random.randint(1, 2)
 		triangles = [
 			[
 				[[0, 0], [width, 0]],
@@ -179,12 +182,13 @@ def generate_truss():
 	return ss
 
 ss = generate_truss()
-ss.point_load(Fy=-300, node_id=ss.find_node_id(vertex=[15/2, 4]))
-ss.solve()
+ss.point_load(Fy=-500, node_id=ss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT]))
+ss.solve(max_iter=500, geometrical_non_linear=True)
+print(ss.get_node_results_system(node_id=ss.find_node_id(vertex=[MIN_WIDTH/2, 0])))
 
-ss.show_structure()
-ss.show_reaction_force()
-ss.show_axial_force()
-ss.show_shear_force()
-ss.show_bending_moment()
-ss.show_displacement()
+# ss.show_structure()
+# ss.show_reaction_force()
+# ss.show_axial_force()
+# ss.show_shear_force()
+# ss.show_bending_moment()
+# ss.show_displacement()

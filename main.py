@@ -9,6 +9,7 @@ import numpy as np
 
 # trusses must span 15 inches, and there must be a connection at the top center of the truss
 # member length must not exceed 72 inches, as 2 lengths of 36 inches
+# must hold >300 lbs but no more than 500
 
 # extra credit: +2
 # holds 320 lbs, less than 60 in

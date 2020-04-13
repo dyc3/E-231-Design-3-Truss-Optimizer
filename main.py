@@ -19,6 +19,13 @@ import numpy as np
 
 MIN_WIDTH = 15
 MAX_HEIGHT = 4
+MAX_POSSIBLE_LOAD = 500 # lbs
+MIN_POSSIBLE_LOAD = 300 # lbs
+
+MODULUS_OF_ELASTICITY = 15900000 # psi
+BRASS_CROSS_SECTION_AREA = 0.006216 # in^2
+BRASS_DENSITY = 0.308 # lbs/in^3
+MOMENT_OF_INERTIA = 1.2968e-05
 
 def dist(a, b):
 	return math.sqrt((b[0] - a[0])**2 + (b[1] - a[1])**2)
@@ -82,7 +89,7 @@ def generate_truss():
 	"""
 	Randomly generate a valid truss
 	"""
-	ss = SystemElements(EA=15000, EI=5000)
+	ss = SystemElements(EA=MODULUS_OF_ELASTICITY * BRASS_CROSS_SECTION_AREA, EI=MODULUS_OF_ELASTICITY * MOMENT_OF_INERTIA)
 	width = MIN_WIDTH
 	height = MAX_HEIGHT
 	subdivide_mode = random.choice(["triangle_subdivide", "radial_subdivide", "pillar_subdivide"])
@@ -183,9 +190,8 @@ def generate_truss():
 	return ss
 
 ss = generate_truss()
-ss.point_load(Fy=-500, node_id=ss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT]))
-ss.solve(max_iter=500, geometrical_non_linear=True)
-print(ss.get_node_results_system(node_id=ss.find_node_id(vertex=[MIN_WIDTH/2, 0])))
+# ss.point_load(Fy=-500, node_id=ss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT]))
+# ss.solve(max_iter=500, geometrical_non_linear=True)
 
 # ss.show_structure()
 # ss.show_reaction_force()
@@ -193,3 +199,25 @@ print(ss.get_node_results_system(node_id=ss.find_node_id(vertex=[MIN_WIDTH/2, 0]
 # ss.show_shear_force()
 # ss.show_bending_moment()
 # ss.show_displacement()
+
+def score_truss(truss):
+	member_lengths = [element.l for element in truss.element_map.values()]
+	total_member_length = sum(member_lengths)
+	material_weight = BRASS_CROSS_SECTION_AREA * total_member_length * BRASS_DENSITY
+
+	load_node_id = ss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT])
+	load_range_min, load_range_max = MIN_POSSIBLE_LOAD, MAX_POSSIBLE_LOAD
+	max_load = 100
+	while load_range_min <= load_range_max:
+		mid = (load_range_min + load_range_max) / 2
+		ss.point_load(Fy=-mid, node_id=load_node_id)
+		ss.solve(max_iter=500, geometrical_non_linear=True)
+		if "no members break": # TODO
+			load_range_min = mid + 1
+			max_load = mid
+		else:
+			load_range_max = mid - 1
+	print(f"all members: {total_member_length} in, {material_weight} lbs, holds max load {max_load}")
+	return max_load / material_weight
+
+print(f"truss score: {score_truss(ss)}")

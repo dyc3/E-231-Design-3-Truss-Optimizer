@@ -256,15 +256,15 @@ def score_truss(truss):
 	load_node_id = truss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT])
 	load_range_min, load_range_max = MIN_POSSIBLE_LOAD, MAX_POSSIBLE_LOAD
 	max_load = 0
-	while load_range_min <= load_range_max:
+	while load_range_max - load_range_min > 0.001:
 		mid = (load_range_min + load_range_max) / 2
 		truss.point_load(Fy=-mid, node_id=load_node_id)
-		truss.solve(max_iter=500, geometrical_non_linear=True)
+		truss.solve(max_iter=500)
 		if not any(check_for_failing_members(truss)):
-			load_range_min = mid + 1
+			load_range_min = mid
 			max_load = mid
 		else:
-			load_range_max = mid - 1
+			load_range_max = mid
 	print(f"all members: {total_member_length} in, {material_weight} lbs, holds max load {max_load}")
 	return max_load / material_weight
 

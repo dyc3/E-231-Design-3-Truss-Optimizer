@@ -86,7 +86,7 @@ test_truss.members = [
 	[2, 3],
 ]
 
-print("is_valid", test_truss.is_valid())
+# print("is_valid", test_truss.is_valid())
 # test_truss.draw()
 
 def generate_truss(subdivide_mode=None, subdivides=None):
@@ -209,6 +209,39 @@ def generate_truss(subdivide_mode=None, subdivides=None):
 	ss.add_support_hinged(node_id=ss.find_node_id(vertex=[width, 0]))
 	return ss
 
+def generate_truss_by_grid(enabled):
+	"""
+	enabled is a list of booleans indicating which members in the grid are enabled. Length must match the total possible members in the grid
+	"""
+	enabled = np.array(enabled)
+	width = MIN_WIDTH / 2
+	height = MAX_HEIGHT
+	grid_size_x = 6
+	grid_size_y = 4
+	all_grid_points = np.array(np.meshgrid(np.arange(0, width + 0.01, width / grid_size_x), np.arange(0, height + 0.01, height / grid_size_y))).T.reshape(-1, 2)
+	all_possible_members = []
+	for point1 in all_grid_points:
+		for point2 in all_grid_points:
+			if np.array_equal(point1, point2):
+				continue
+			all_possible_members.append([point1, point2])
+	all_possible_members = np.array(all_possible_members)
+	print(f"number of possible members: {len(all_possible_members)}")
+	assert len(all_possible_members) == len(enabled)
+	members = all_possible_members[enabled]
+	print(f"members selected: {len(members)}")
+	# mirror the members to the right side
+	members_mirror = np.copy(members)
+	for member in members_mirror:
+		for point in member:
+			point[0] *= -1
+			point[0] += width * 2
+	members = np.append(members, members_mirror, axis=0)
+	truss = SystemElements(EA=MODULUS_OF_ELASTICITY * BRASS_CROSS_SECTION_AREA, EI=MODULUS_OF_ELASTICITY * MOMENT_OF_INERTIA)
+	for member in members:
+		truss.add_truss_element(member)
+	return truss
+
 # ss = generate_truss("radial_subdivide", 2)
 # ss.point_load(Fy=-500, node_id=ss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT]))
 # ss.solve(max_iter=500, geometrical_non_linear=True)
@@ -272,9 +305,12 @@ def score_truss(truss, silent=False):
 		print(f"all members: {total_member_length} in, {material_weight:.2f} lbs, holds max load {max_load:.2f}")
 	return max_load / material_weight
 
-for mode in ["triangle_subdivide", "radial_subdivide", "pillar_subdivide"]:
-	for subdivides in range(1, 5):
-		truss = generate_truss(mode, subdivides)
-		is_valid = is_truss_valid(truss)
-		score = score_truss(truss)
-		print(f"truss {mode}/{subdivides} valid: {is_valid} score: {score:.1f}")
+# for mode in ["triangle_subdivide", "radial_subdivide", "pillar_subdivide"]:
+# 	for subdivides in range(1, 5):
+# 		truss = generate_truss(mode, subdivides)
+# 		is_valid = is_truss_valid(truss)
+# 		score = score_truss(truss)
+# 		print(f"truss {mode}/{subdivides} valid: {is_valid} score: {score:.1f}")
+
+truss = generate_truss_by_grid(([True, False, True, False, False, True, False, False, False, False] * 500)[:1190])
+truss.show_structure()

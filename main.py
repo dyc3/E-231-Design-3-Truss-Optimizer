@@ -135,10 +135,22 @@ def generate_truss(subdivide_mode=None, subdivides=None):
 					],
 				]
 			triangles = new_triangles
-		# TODO: deduplicate lines
-		for triangle in triangles:
-			for line in triangle:
-				ss.add_truss_element(location=line)
+		raw_lines = np.reshape(triangles, (-1, 2, 2))
+		# sort coordinates in each line
+		raw_lines = [sorted(line, key=lambda p: p[0]) for line in raw_lines]
+		# sort lines by first point's x value
+		raw_lines = sorted(raw_lines, key=lambda l: l[0][0])
+		# remove duplicate lines
+		lines = []
+		for line in raw_lines:
+			is_duplicate = False
+			for l in lines:
+				if np.array_equal(line, l):
+					is_duplicate = True
+			if not is_duplicate:
+				lines.append(line)
+		for line in lines:
+			ss.add_truss_element(location=line)
 	elif subdivide_mode == "radial_subdivide":
 		if not subdivides:
 			subdivides = random.randint(1, 4)

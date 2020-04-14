@@ -241,7 +241,7 @@ def score_truss(truss):
 	total_member_length = sum(member_lengths)
 	material_weight = BRASS_CROSS_SECTION_AREA * total_member_length * BRASS_DENSITY
 
-	load_node_id = ss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT])
+	load_node_id = truss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT])
 	load_range_min, load_range_max = MIN_POSSIBLE_LOAD, MAX_POSSIBLE_LOAD
 	max_load = 0
 	while load_range_min <= load_range_max:

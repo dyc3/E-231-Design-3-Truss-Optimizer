@@ -20,7 +20,7 @@ import numpy as np
 MIN_WIDTH = 15
 MAX_HEIGHT = 4
 MAX_POSSIBLE_LOAD = 500 # lbs
-MIN_POSSIBLE_LOAD = 300 # lbs
+MIN_POSSIBLE_LOAD = 0 # lbs
 
 MODULUS_OF_ELASTICITY = 15900000 # psi
 BRASS_YIELD_STRESS = 59000 # psi
@@ -209,15 +209,7 @@ def generate_truss(subdivide_mode=None, subdivides=None):
 	ss.add_support_hinged(node_id=ss.find_node_id(vertex=[width, 0]))
 	return ss
 
-def generate_truss_by_grid(enabled):
-	"""
-	enabled is a list of booleans indicating which members in the grid are enabled. Length must match the total possible members in the grid
-	"""
-	enabled = np.array(enabled)
-	width = MIN_WIDTH / 2
-	height = MAX_HEIGHT
-	grid_size_x = 6
-	grid_size_y = 4
+def generate_truss_grid(height, width, grid_size_x, grid_size_y):
 	all_grid_points = np.array(np.meshgrid(np.arange(0, width + 0.01, width / grid_size_x), np.arange(0, height + 0.01, height / grid_size_y))).T.reshape(-1, 2)
 	all_possible_members = []
 	for point1 in all_grid_points:
@@ -225,7 +217,16 @@ def generate_truss_by_grid(enabled):
 			if np.array_equal(point1, point2):
 				continue
 			all_possible_members.append([point1, point2])
-	all_possible_members = np.array(all_possible_members)
+	return np.array(all_possible_members)
+
+def generate_truss_by_grid(grid, enabled):
+	"""
+	enabled is a list of booleans indicating which members in the grid are enabled. Length must match the total possible members in the grid
+	"""
+	enabled = np.array(enabled)
+	width = MIN_WIDTH / 2
+	height = MAX_HEIGHT
+	all_possible_members = grid
 	print(f"number of possible members: {len(all_possible_members)}")
 	assert len(all_possible_members) == len(enabled)
 	members = all_possible_members[enabled]
@@ -240,7 +241,12 @@ def generate_truss_by_grid(enabled):
 	truss = SystemElements(EA=MODULUS_OF_ELASTICITY * BRASS_CROSS_SECTION_AREA, EI=MODULUS_OF_ELASTICITY * MOMENT_OF_INERTIA)
 	for member in members:
 		truss.add_truss_element(member)
-	return truss
+	try:
+		truss.add_support_hinged(node_id=truss.find_node_id(vertex=[0, 0]))
+		truss.add_support_hinged(node_id=truss.find_node_id(vertex=[width * 2, 0]))
+		return truss
+	except:
+		return None
 
 # ss = generate_truss("radial_subdivide", 2)
 # ss.point_load(Fy=-500, node_id=ss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT]))
@@ -298,9 +304,9 @@ def score_truss(truss, silent=False):
 		truss.solve(max_iter=500)
 		if not any(check_for_failing_members(truss)):
 			load_range_min = mid
-			max_load = mid
 		else:
 			load_range_max = mid
+		max_load = mid
 	if not silent:
 		print(f"all members: {total_member_length} in, {material_weight:.2f} lbs, holds max load {max_load:.2f}")
 	return max_load / material_weight
@@ -312,5 +318,16 @@ def score_truss(truss, silent=False):
 # 		score = score_truss(truss)
 # 		print(f"truss {mode}/{subdivides} valid: {is_valid} score: {score:.1f}")
 
-truss = generate_truss_by_grid(([True, False, True, False, False, True, False, False, False, False] * 500)[:1190])
+# truss = generate_truss_by_grid(([False, False, False, False, False, True, False, False, False, False, False, False, False] * 500)[:1190])
+# truss.show_structure()
+
+np.random.seed(42)
+grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH, 4, 6)
+
+truss = None
+while not truss or not is_truss_valid(truss):
+	truss = generate_truss_by_grid(grid, np.random.rand(1190) < 0.035)
+
 truss.show_structure()
+print(f"truss score: {score_truss(truss):.1f}")
+truss.show_results()

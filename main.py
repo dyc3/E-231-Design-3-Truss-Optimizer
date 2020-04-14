@@ -227,7 +227,7 @@ def generate_truss_by_grid(grid, enabled):
 	width = MIN_WIDTH / 2
 	height = MAX_HEIGHT
 	all_possible_members = grid
-	print(f"number of possible members: {len(all_possible_members)}")
+	# print(f"number of possible members: {len(all_possible_members)}")
 	assert len(all_possible_members) == len(enabled)
 	members = all_possible_members[enabled]
 	print(f"members selected: {len(members)}")
@@ -324,10 +324,17 @@ def score_truss(truss, silent=False):
 np.random.seed(42)
 grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH, 4, 6)
 
-truss = None
-while not truss or not is_truss_valid(truss):
-	truss = generate_truss_by_grid(grid, np.random.rand(1190) < 0.035)
+def generate_valid_truss(grid):
+	truss = None
+	while not truss or not is_truss_valid(truss):
+		truss = generate_truss_by_grid(grid, np.random.rand(1190) < 0.035)
+		if not truss.find_node_id(vertex=[MIN_WIDTH / 2, MAX_HEIGHT]):
+			truss = None
+	return truss
 
-truss.show_structure()
-print(f"truss score: {score_truss(truss):.1f}")
-truss.show_results()
+trusses = [generate_valid_truss(grid) for _ in range(10)]
+
+for truss in trusses:
+	# truss.show_structure()
+	print(f"truss score: {score_truss(truss):.1f}")
+	# truss.show_results()

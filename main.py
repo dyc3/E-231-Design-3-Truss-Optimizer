@@ -220,6 +220,9 @@ ss = generate_truss("radial_subdivide", 2)
 # ss.show_bending_moment()
 # ss.show_displacement()
 
+def is_truss_valid(truss):
+	return len(truss.element_map.values()) == 2 * len(truss.node_map.values()) - 3
+
 def check_for_failing_members(truss):
 	def calculate_max_force(member):
 		force = member['N']

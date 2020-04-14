@@ -85,16 +85,18 @@ test_truss.members = [
 print("is_valid", test_truss.is_valid())
 # test_truss.draw()
 
-def generate_truss():
+def generate_truss(subdivide_mode=None, subdivides=None):
 	"""
 	Randomly generate a valid truss
 	"""
 	ss = SystemElements(EA=MODULUS_OF_ELASTICITY * BRASS_CROSS_SECTION_AREA, EI=MODULUS_OF_ELASTICITY * MOMENT_OF_INERTIA)
 	width = MIN_WIDTH
 	height = MAX_HEIGHT
-	subdivide_mode = random.choice(["triangle_subdivide", "radial_subdivide", "pillar_subdivide"])
+	if not subdivide_mode:
+		subdivide_mode = random.choice(["triangle_subdivide", "radial_subdivide", "pillar_subdivide"])
 	if subdivide_mode == "triangle_subdivide":
-		subdivides = random.randint(1, 2)
+		if not subdivides:
+			subdivides = random.randint(1, 2)
 		triangles = [
 			[
 				[[0, 0], [width, 0]],
@@ -134,7 +136,8 @@ def generate_truss():
 			for line in triangle:
 				ss.add_truss_element(location=line)
 	elif subdivide_mode == "radial_subdivide":
-		subdivides = random.randint(1, 4)
+		if not subdivides:
+			subdivides = random.randint(1, 4)
 		step_size = width / 2 / subdivides
 		bottom_midpoint = midpoint([0, 0], [width, 0])
 		lines = []
@@ -153,7 +156,8 @@ def generate_truss():
 		for line in lines:
 			ss.add_truss_element(location=line)
 	elif subdivide_mode == "pillar_subdivide":
-		subdivides = random.randint(1, 4)
+		if not subdivides:
+			subdivides = random.randint(1, 4)
 		step_size = width / 2 / subdivides
 		lines = []
 		for x in np.arange(step_size, width, step_size):
@@ -212,6 +216,7 @@ def score_truss(truss):
 		mid = (load_range_min + load_range_max) / 2
 		ss.point_load(Fy=-mid, node_id=load_node_id)
 		ss.solve(max_iter=500, geometrical_non_linear=True)
+		print(ss.get_element_result_range('shear'))
 		if "no members break": # TODO
 			load_range_min = mid + 1
 			max_load = mid

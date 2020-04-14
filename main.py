@@ -209,7 +209,7 @@ def generate_truss(subdivide_mode=None, subdivides=None):
 	ss.add_support_fixed(node_id=ss.find_node_id(vertex=[width, 0]))
 	return ss
 
-ss = generate_truss("radial_subdivide", 2)
+# ss = generate_truss("radial_subdivide", 2)
 # ss.point_load(Fy=-500, node_id=ss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT]))
 # ss.solve(max_iter=500, geometrical_non_linear=True)
 
@@ -271,4 +271,9 @@ def score_truss(truss):
 	print(f"all members: {total_member_length} in, {material_weight} lbs, holds max load {max_load}")
 	return max_load / material_weight
 
-print(f"truss score: {score_truss(ss)}")
+for mode in ["triangle_subdivide", "radial_subdivide", "pillar_subdivide"]:
+	truss = generate_truss(mode, 2)
+	is_valid = is_truss_valid(truss)
+	score = score_truss(truss)
+	print(f"{mode} truss valid: {is_valid} score: {score}")
+	# truss.show_results()

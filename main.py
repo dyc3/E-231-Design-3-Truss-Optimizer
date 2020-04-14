@@ -205,8 +205,8 @@ def generate_truss(subdivide_mode=None, subdivides=None):
 		for line in lines:
 			ss.add_truss_element(location=line)
 
-	ss.add_support_fixed(node_id=ss.find_node_id(vertex=[0, 0]))
-	ss.add_support_fixed(node_id=ss.find_node_id(vertex=[width, 0]))
+	ss.add_support_hinged(node_id=ss.find_node_id(vertex=[0, 0]))
+	ss.add_support_hinged(node_id=ss.find_node_id(vertex=[width, 0]))
 	return ss
 
 # ss = generate_truss("radial_subdivide", 2)
@@ -221,7 +221,7 @@ def generate_truss(subdivide_mode=None, subdivides=None):
 # ss.show_displacement()
 
 def is_truss_valid(truss):
-	return len(truss.element_map.values()) == 2 * len(truss.node_map.values()) - 3
+	return len(truss.element_map.values()) >= 2 * len(truss.node_map.values()) - 4
 
 def check_for_failing_members(truss):
 	def calculate_max_force(member):
@@ -251,7 +251,7 @@ def check_for_failing_members(truss):
 
 	return map(calculate_max_force, truss.get_element_results())
 
-def score_truss(truss):
+def score_truss(truss, silent=False):
 	member_lengths = [element.l for element in truss.element_map.values()]
 	total_member_length = sum(member_lengths)
 	material_weight = BRASS_CROSS_SECTION_AREA * total_member_length * BRASS_DENSITY
@@ -268,12 +268,13 @@ def score_truss(truss):
 			max_load = mid
 		else:
 			load_range_max = mid
-	print(f"all members: {total_member_length} in, {material_weight} lbs, holds max load {max_load}")
+	if not silent:
+		print(f"all members: {total_member_length} in, {material_weight:.2f} lbs, holds max load {max_load:.2f}")
 	return max_load / material_weight
 
 for mode in ["triangle_subdivide", "radial_subdivide", "pillar_subdivide"]:
-	truss = generate_truss(mode, 2)
-	is_valid = is_truss_valid(truss)
-	score = score_truss(truss)
-	print(f"{mode} truss valid: {is_valid} score: {score}")
-	# truss.show_results()
+	for subdivides in range(1, 5):
+		truss = generate_truss(mode, subdivides)
+		is_valid = is_truss_valid(truss)
+		score = score_truss(truss)
+		print(f"truss {mode}/{subdivides} valid: {is_valid} score: {score:.1f}")

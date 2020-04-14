@@ -23,9 +23,13 @@ MAX_POSSIBLE_LOAD = 500 # lbs
 MIN_POSSIBLE_LOAD = 300 # lbs
 
 MODULUS_OF_ELASTICITY = 15900000 # psi
+BRASS_YIELD_STRESS = 59000 # psi
 BRASS_CROSS_SECTION_AREA = 0.006216 # in^2
 BRASS_DENSITY = 0.308 # lbs/in^3
 MOMENT_OF_INERTIA = 1.2968e-05
+
+JOHNSON_EULER_TRANSITION_lENGTH = 3.3 # in
+END_CONDITION_FACTOR = 0.8 # in
 
 def dist(a, b):
 	return math.sqrt((b[0] - a[0])**2 + (b[1] - a[1])**2)
@@ -193,7 +197,7 @@ def generate_truss(subdivide_mode=None, subdivides=None):
 	ss.add_support_fixed(node_id=ss.find_node_id(vertex=[width, 0]))
 	return ss
 
-ss = generate_truss()
+ss = generate_truss("radial_subdivide", 2)
 # ss.point_load(Fy=-500, node_id=ss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT]))
 # ss.solve(max_iter=500, geometrical_non_linear=True)
 
@@ -204,6 +208,34 @@ ss = generate_truss()
 # ss.show_bending_moment()
 # ss.show_displacement()
 
+def check_for_failing_members(truss):
+	def calculate_max_force(member):
+		force = member['N']
+
+		if force > 0:
+			if member['length'] < JOHNSON_EULER_TRANSITION_lENGTH:
+				# perform johnson calculation
+				max_load = (
+					BRASS_CROSS_SECTION_AREA *
+					(BRASS_YIELD_STRESS - (MODULUS_OF_ELASTICITY ** -1 *
+					(((BRASS_YIELD_STRESS / (2 * math.pi)) ** 2) *
+					(END_CONDITION_FACTOR * member['length'] /
+					math.sqrt(MOMENT_OF_INERTIA / BRASS_CROSS_SECTION_AREA)) ** 2
+					))))
+
+			else:
+				# perfrom euler calculation
+				max_load = (
+					(math.pi ** 2 * MODULUS_OF_ELASTICITY * MOMENT_OF_INERTIA) /
+					(END_CONDITION_FACTOR * member['length']) ** 2
+				)
+
+			return force > max_load
+		else:
+			return False
+
+	return map(calculate_max_force, truss.get_element_results())
+
 def score_truss(truss):
 	member_lengths = [element.l for element in truss.element_map.values()]
 	total_member_length = sum(member_lengths)
@@ -211,13 +243,12 @@ def score_truss(truss):
 
 	load_node_id = ss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT])
 	load_range_min, load_range_max = MIN_POSSIBLE_LOAD, MAX_POSSIBLE_LOAD
-	max_load = 100
+	max_load = 0
 	while load_range_min <= load_range_max:
 		mid = (load_range_min + load_range_max) / 2
-		ss.point_load(Fy=-mid, node_id=load_node_id)
-		ss.solve(max_iter=500, geometrical_non_linear=True)
-		print(ss.get_element_result_range('shear'))
-		if "no members break": # TODO
+		truss.point_load(Fy=-mid, node_id=load_node_id)
+		truss.solve(max_iter=500, geometrical_non_linear=True)
+		if not any(check_for_failing_members(truss)):
 			load_range_min = mid + 1
 			max_load = mid
 		else:

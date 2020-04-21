@@ -264,7 +264,7 @@ def generate_truss_by_grid(grid, enabled):
 def is_truss_valid(truss):
 	return len(truss.element_map.values()) >= 2 * len(truss.node_map.values()) - 4
 
-def check_for_failing_members(truss):
+def check_max_load(truss):
 	def calculate_max_force(member):
 		force = member['N']
 
@@ -286,11 +286,11 @@ def check_for_failing_members(truss):
 					(END_CONDITION_FACTOR * member['length']) ** 2
 				)
 
-			return force > max_load
+			return force / max_load
 		else:
 			return False
 
-	return map(calculate_max_force, truss.get_element_results())
+	return min(map(calculate_max_force, truss.get_element_results()))
 
 def score_truss(truss, silent=False):
 	member_lengths = [element.l for element in truss.element_map.values()]
@@ -299,19 +299,12 @@ def score_truss(truss, silent=False):
 
 	load_node_id = truss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT])
 	load_range_min, load_range_max = MIN_POSSIBLE_LOAD, MAX_POSSIBLE_LOAD
-	max_load = 0
-	while load_range_max - load_range_min > 0.001:
-		mid = (load_range_min + load_range_max) / 2
-		truss.point_load(Fy=-mid, node_id=load_node_id)
-		truss.solve(max_iter=500)
-		if not any(check_for_failing_members(truss)):
-			load_range_min = mid
-		else:
-			load_range_max = mid
-		max_load = mid
+	truss.point_load(Fy=-1, node_id=load_node_id)
+	truss.solve(max_iter=500)
+	max_load = check_max_load(truss)
 	if not silent:
 		print(f"all members: {total_member_length} in, {material_weight:.2f} lbs, holds max load {max_load:.2f}")
-	return max_load / material_weight
+	return max_load / total_member_length
 
 # for mode in ["triangle_subdivide", "radial_subdivide", "pillar_subdivide"]:
 # 	for subdivides in range(1, 5):
@@ -329,7 +322,7 @@ grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH, 4, 6)
 def generate_valid_truss(grid):
 	truss = members = None
 	while not truss or not is_truss_valid(truss):
-		members = np.random.rand(1190) < 0.035
+		members = np.random.rand(1190) < 0.03
 		truss = generate_truss_by_grid(grid, members)
 		if truss and not truss.find_node_id(vertex=[MIN_WIDTH / 2, MAX_HEIGHT]):
 			truss = None
@@ -385,7 +378,7 @@ def rank_selection(pop, fitness):
 	:param fitness: (array) Fitness values.
 	:return: (array) Population selection with replacement, selected for mating.
 	"""
-	order = np.argsort(fitness)[::-1]
+	order = np.argsort(fitness)
 	# Population ordered by fitness.
 	pop = np.array(pop)[order]
 

@@ -211,14 +211,19 @@ def generate_truss(subdivide_mode=None, subdivides=None):
 	ss.add_support_hinged(node_id=ss.find_node_id(vertex=[width, 0]))
 	return ss
 
-def generate_truss_grid(height, width, grid_size_x, grid_size_y):
+def generate_truss_grid(height, width, grid_size_x, grid_size_y, hyper_connected=False):
 	all_grid_points = np.array(np.meshgrid(np.arange(0, width + 0.01, width / grid_size_x), np.arange(0, height + 0.01, height / grid_size_y))).T.reshape(-1, 2)
 	all_possible_members = []
-	for point1 in all_grid_points:
-		for point2 in all_grid_points:
-			if np.array_equal(point1, point2):
-				continue
-			all_possible_members.append([point1, point2])
+	if hyper_connected:
+		for point1 in all_grid_points:
+			for point2 in all_grid_points:
+				if np.array_equal(point1, point2):
+					continue
+				all_possible_members.append([point1, point2])
+	else:
+		max_dist = euclidean([0, 0], [width / grid_size_x, height / grid_size_y]) + 0.01
+		comb = np.array(list(filter(lambda x: euclidean(all_grid_points[x[1]], all_grid_points[x[0]]) <= max_dist, combinations(range(len(all_grid_points)), 2))))
+		all_possible_members = list(map(lambda idx: [all_grid_points[idx[0]], all_grid_points[idx[1]]], comb))
 	return np.array(all_possible_members)
 
 def generate_truss_by_grid(grid, enabled):

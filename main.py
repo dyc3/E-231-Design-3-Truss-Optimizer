@@ -8,6 +8,8 @@ import copy
 import numpy as np
 from tqdm import tqdm
 import os, pickle
+from itertools import combinations
+from scipy.spatial.distance import euclidean
 
 # trusses must span 15 inches, and there must be a connection at the top center of the truss
 # member length must not exceed 72 inches, as 2 lengths of 36 inches
@@ -295,7 +297,8 @@ def check_max_load(truss):
 		else:
 			return False
 
-	return min(map(calculate_max_force, truss.get_element_results()))
+	loads = list(map(calculate_max_force, truss.get_element_results()))
+	return min(list(filter(lambda x: x > 0, loads)) or [0])
 
 def score_truss(truss, silent=False):
 	member_lengths = [element.l for element in truss.element_map.values()]
@@ -308,8 +311,8 @@ def score_truss(truss, silent=False):
 	truss.solve(max_iter=500)
 	max_load = check_max_load(truss)
 	if not silent:
-		print(f"all members: {total_member_length} in, {material_weight:.2f} lbs, holds max load {max_load:.2f}")
-	return max_load / total_member_length
+		print(f"all members: {total_member_length} in, {material_weight:.2f} lbs, holds max load {max_load}")
+	return max_load / material_weight
 
 # for mode in ["triangle_subdivide", "radial_subdivide", "pillar_subdivide"]:
 # 	for subdivides in range(1, 5):
@@ -318,16 +321,16 @@ def score_truss(truss, silent=False):
 # 		score = score_truss(truss)
 # 		print(f"truss {mode}/{subdivides} valid: {is_valid} score: {score:.1f}")
 
-# truss = generate_truss_by_grid(([False, False, False, False, False, True, False, False, False, False, False, False, False] * 500)[:1190])
-# truss.show_structure()
-
 np.random.seed(42)
-grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH, 4, 6)
+grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH, 4, 3, hyper_connected=False)
+
+# truss = generate_truss_by_grid(grid, ([True, True, False] * 5000)[:len(grid)])
+# truss.show_structure()
 
 def generate_valid_truss(grid):
 	truss = members = None
 	while not truss or not is_truss_valid(truss):
-		members = np.random.rand(len(grid)) < 0.03
+		members = np.random.rand(len(grid)) < 0.3 # < 0.03
 		truss = generate_truss_by_grid(grid, members)
 		if truss and not truss.find_node_id(vertex=[MIN_WIDTH / 2, MAX_HEIGHT]):
 			truss = None
@@ -341,7 +344,7 @@ truss_population = [generate_valid_truss(grid) for _ in range(40)]
 # 		organism[idx] = not organism[idx]
 # 	return organism
 
-def mutate(pop, mutation_rate=0.01):
+def mutate(pop, mutation_rate=0.008):
 	"""
 	Vectorized random mutations.
 	:param pop: (array)
@@ -353,7 +356,7 @@ def mutate(pop, mutation_rate=0.01):
 	pop[idx] = val
 	return pop
 
-def crossover(pop, cross_rate=0.8):
+def crossover(pop, cross_rate=0.5):
 	"""
 	Vectorized crossover
 	:param pop: (array)
@@ -412,6 +415,7 @@ def genetic_optimization(population):
 		try:
 			fig = generate_truss_by_grid(grid, population[max_idx]).show_structure(show=False, verbosity=1)
 
+			print(f"fitness = {round(fitness[max_idx], 3)}")
 			plt.title(f"fitness = {round(fitness[max_idx], 3)}")
 
 			fig.savefig(os.path.join("./img", name, f"ga{generation}.png"))
@@ -438,5 +442,5 @@ def genetic_optimization(population):
 for members in genetic_optimization(truss_population):
 	truss = generate_truss_by_grid(grid, members)
 	# truss.show_structure()
-	print(f"truss score: {score_truss(truss):.1f}")
-	truss.show_results()
+	print(f"truss score: {score_truss(truss)}")
+	# truss.show_results()

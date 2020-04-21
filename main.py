@@ -322,7 +322,7 @@ grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH, 4, 6)
 def generate_valid_truss(grid):
 	truss = members = None
 	while not truss or not is_truss_valid(truss):
-		members = np.random.rand(1190) < 0.03
+		members = np.random.rand(len(grid)) < 0.03
 		truss = generate_truss_by_grid(grid, members)
 		if truss and not truss.find_node_id(vertex=[MIN_WIDTH / 2, MAX_HEIGHT]):
 			truss = None
@@ -415,7 +415,7 @@ def genetic_optimization(population):
 		except AttributeError:
 			pass
 
-		pop = rank_selection(population, fitness)
+		pop = copy.deepcopy(rank_selection(population, fitness))
 		while True:
 			new_population = mutate(crossover(pop))
 			is_pop_valid = True
@@ -432,6 +432,6 @@ def genetic_optimization(population):
 
 for members in genetic_optimization(truss_population):
 	truss = generate_truss_by_grid(grid, members)
-	truss.show_structure()
+	# truss.show_structure()
 	print(f"truss score: {score_truss(truss):.1f}")
-	# truss.show_results()
+	truss.show_results()

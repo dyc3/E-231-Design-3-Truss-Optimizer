@@ -6,6 +6,8 @@ from anastruct import SystemElements
 import random
 import copy
 import numpy as np
+from tqdm import tqdm
+import os, pickle
 
 # trusses must span 15 inches, and there must be a connection at the top center of the truss
 # member length must not exceed 72 inches, as 2 lengths of 36 inches
@@ -230,7 +232,7 @@ def generate_truss_by_grid(grid, enabled):
 	# print(f"number of possible members: {len(all_possible_members)}")
 	assert len(all_possible_members) == len(enabled)
 	members = all_possible_members[enabled]
-	print(f"members selected: {len(members)}")
+	# print(f"members selected: {len(members)}")
 	# mirror the members to the right side
 	members_mirror = np.copy(members)
 	for member in members_mirror:
@@ -325,16 +327,118 @@ np.random.seed(42)
 grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH, 4, 6)
 
 def generate_valid_truss(grid):
-	truss = None
+	truss = members = None
 	while not truss or not is_truss_valid(truss):
-		truss = generate_truss_by_grid(grid, np.random.rand(1190) < 0.035)
-		if not truss.find_node_id(vertex=[MIN_WIDTH / 2, MAX_HEIGHT]):
+		members = np.random.rand(1190) < 0.035
+		truss = generate_truss_by_grid(grid, members)
+		if truss and not truss.find_node_id(vertex=[MIN_WIDTH / 2, MAX_HEIGHT]):
 			truss = None
-	return truss
+	return members
 
-trusses = [generate_valid_truss(grid) for _ in range(10)]
+truss_population = [generate_valid_truss(grid) for _ in range(40)]
 
-for truss in trusses:
-	# truss.show_structure()
+# def mutate(organism):
+# 	toggle_idxs = np.random.randint(0, len(organism), math.floor(len(organism) * 0.0075))
+# 	for idx in toggle_idxs:
+# 		organism[idx] = not organism[idx]
+# 	return organism
+
+def mutate(pop, mutation_rate=0.01):
+	"""
+	Vectorized random mutations.
+	:param pop: (array)
+	:param mutation_rate: (flt)
+	:return: (array)
+	"""
+	idx = np.where(np.random.rand(pop.shape[0], pop.shape[1]) < mutation_rate)
+	val = np.random.randint(0, 2, idx[0].shape[0])
+	pop[idx] = val
+	return pop
+
+def crossover(pop, cross_rate=0.8):
+	"""
+	Vectorized crossover
+	:param pop: (array)
+	:param cross_rate: (flt)
+	:return: (array)
+	"""
+	# [bool] Rows that will crossover.
+	selection_rows = np.random.rand(pop.shape[0]) < cross_rate
+
+	selection = pop[selection_rows]
+	shuffle_seed = np.arange(selection.shape[0])
+	np.random.shuffle(shuffle_seed)
+
+	# 2d array with [rows of the (selected) population, bool]
+	cross_idx = np.array(np.round(np.random.rand(selection.shape[0], pop.shape[1])), dtype=np.bool)
+	idx = np.where(cross_idx)
+
+	selection[idx] = selection[shuffle_seed][idx]
+	pop[selection_rows] = selection
+
+	return pop
+
+def rank_selection(pop, fitness):
+	"""
+	Rank selection. And make a selection based on their ranking score. Note that this isn't the fitness.
+	:param pop: (array) Population.
+	:param fitness: (array) Fitness values.
+	:return: (array) Population selection with replacement, selected for mating.
+	"""
+	order = np.argsort(fitness)[::-1]
+	# Population ordered by fitness.
+	pop = np.array(pop)[order]
+
+	# Rank probability is proportional to you position, not you fitness. So an ordered fitness array, would have these
+	# probabilities [1, 1/2, 1/3 ... 1/n] / sum
+	rank_p = 1 / np.arange(1, pop.shape[0] + 1)
+	# Make a selection based on their ranking.
+	idx = np.random.choice(np.arange(pop.shape[0]), size=pop.shape[0], replace=True, p=rank_p / np.sum(rank_p))
+	return pop[idx]
+
+name = "grid_4_6"
+
+def genetic_optimization(population):
+	for generation in range(20):
+		print(f"GENERATION {generation}")
+		fitness = []
+		for organism in tqdm(population):
+			try:
+				fitness.append(score_truss(generate_truss_by_grid(grid, organism), True))
+			except np.linalg.LinAlgError:
+				fitness.append(0)
+		fitness = np.array(fitness)
+		max_idx = np.argmax(fitness)
+
+		# generate_truss_by_grid(grid, population[max_idx]).show_structure()
+		try:
+			fig = generate_truss_by_grid(grid, population[max_idx]).show_structure(show=False, verbosity=1)
+
+			plt.title(f"fitness = {round(fitness[max_idx], 3)}")
+
+			fig.savefig(os.path.join("./img", name, f"ga{generation}.png"))
+			with open(os.path.join("./img", name, "save.pkl"), "wb") as f:
+				pickle.dump(population, f)
+		except AttributeError:
+			pass
+
+		pop = rank_selection(population, fitness)
+		while True:
+			new_population = mutate(crossover(pop))
+			is_pop_valid = True
+			for members in new_population:
+				truss = generate_truss_by_grid(grid, members)
+				if not truss or not truss.find_node_id(vertex=[MIN_WIDTH / 2, MAX_HEIGHT]):
+					is_pop_valid = False
+					break
+			if is_pop_valid:
+				population = new_population
+				break
+
+	return population
+
+for members in genetic_optimization(truss_population):
+	truss = generate_truss_by_grid(grid, members)
+	truss.show_structure()
 	print(f"truss score: {score_truss(truss):.1f}")
 	# truss.show_results()

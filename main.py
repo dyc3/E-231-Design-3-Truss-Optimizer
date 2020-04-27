@@ -399,9 +399,12 @@ def eliminate_zero_force_members(organism):
 	truss = generate_truss_by_grid(grid, organism)
 	truss.point_load(Fy=-100, node_id=truss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT]))
 	truss.solve()
-	loads = np.array(list(map(calculate_max_force, truss.get_element_results()))[:len(organism)])
-	idxs = np.where((loads == 0) | (loads == False))[0]
-	organism[idxs] = False
+	member_idxs = np.where(organism)[0]
+	loads = np.array(list(map(calculate_max_force, truss.get_element_results())))
+	assert len(member_idxs) * 2 == len(loads)
+	loads = loads[:len(member_idxs)]
+	zero_force_idxs = member_idxs[np.where((loads == 0) | (loads == False))[0]]
+	organism[zero_force_idxs] = False
 	return organism
 
 name = "grid_4_6"
@@ -426,7 +429,10 @@ def genetic_optimization(population):
 		try:
 			print(f"fitness = {round(fitness[max_idx], 3)}")
 			save_organism_figure(population[max_idx], fitness[max_idx], generation)
-			save_organism_figure(eliminate_zero_force_members(population[max_idx]), fitness[max_idx], generation, "_nozero")
+			try:
+				save_organism_figure(eliminate_zero_force_members(population[max_idx]), fitness[max_idx], generation, "_nozero")
+			except np.linalg.LinAlgError:
+				pass
 			with open(os.path.join("./img", name, "save.pkl"), "wb") as f:
 				pickle.dump(population, f)
 		except AttributeError:

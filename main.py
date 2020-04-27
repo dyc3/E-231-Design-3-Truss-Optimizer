@@ -405,9 +405,8 @@ def eliminate_zero_force_members(organism):
 	truss = generate_truss_by_grid(grid, organism)
 	truss.point_load(Fy=-100, node_id=truss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT]))
 	truss.solve()
-	loads = list(map(calculate_max_force, truss.get_element_results()))
-	# idxs = np.array([i for i, x in enumerate(loads) if not x])
-	idxs = np.where(loads)[0]
+	loads = np.array(list(map(calculate_max_force, truss.get_element_results()))[:len(organism)])
+	idxs = np.where((loads == 0) | (loads == False))[0]
 	organism[idxs] = False
 	return organism
 

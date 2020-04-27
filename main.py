@@ -271,32 +271,32 @@ def generate_truss_by_grid(grid, enabled):
 def is_truss_valid(truss):
 	return len(truss.element_map.values()) >= 2 * len(truss.node_map.values()) - 4
 
-def check_max_load(truss):
-	def calculate_max_force(member):
-		force = member['N']
+def calculate_max_force(member):
+	force = member['N']
 
-		if force > 0:
-			if member['length'] < JOHNSON_EULER_TRANSITION_lENGTH:
-				# perform johnson calculation
-				max_load = (
-					BRASS_CROSS_SECTION_AREA *
-					(BRASS_YIELD_STRESS - (MODULUS_OF_ELASTICITY ** -1 *
-					(((BRASS_YIELD_STRESS / (2 * math.pi)) ** 2) *
-					(END_CONDITION_FACTOR * member['length'] /
-					math.sqrt(MOMENT_OF_INERTIA / BRASS_CROSS_SECTION_AREA)) ** 2
-					))))
+	if force > 0:
+		if member['length'] < JOHNSON_EULER_TRANSITION_lENGTH:
+			# perform johnson calculation
+			max_load = (
+				BRASS_CROSS_SECTION_AREA *
+				(BRASS_YIELD_STRESS - (MODULUS_OF_ELASTICITY ** -1 *
+				(((BRASS_YIELD_STRESS / (2 * math.pi)) ** 2) *
+				(END_CONDITION_FACTOR * member['length'] /
+				math.sqrt(MOMENT_OF_INERTIA / BRASS_CROSS_SECTION_AREA)) ** 2
+				))))
 
-			else:
-				# perfrom euler calculation
-				max_load = (
-					(math.pi ** 2 * MODULUS_OF_ELASTICITY * MOMENT_OF_INERTIA) /
-					(END_CONDITION_FACTOR * member['length']) ** 2
-				)
-
-			return force / max_load
 		else:
-			return False
+			# perfrom euler calculation
+			max_load = (
+				(math.pi ** 2 * MODULUS_OF_ELASTICITY * MOMENT_OF_INERTIA) /
+				(END_CONDITION_FACTOR * member['length']) ** 2
+			)
 
+		return force / max_load
+	else:
+		return False
+
+def check_max_load(truss):
 	loads = list(map(calculate_max_force, truss.get_element_results()))
 	return min(list(filter(lambda x: x > 0, loads)) or [0])
 
@@ -397,7 +397,23 @@ def rank_selection(pop, fitness):
 	idx = np.random.choice(np.arange(pop.shape[0]), size=pop.shape[0], replace=True, p=rank_p / np.sum(rank_p))
 	return pop[idx]
 
+def eliminate_zero_force_members(organism):
+	organism = copy.deepcopy(organism)
+	truss = generate_truss_by_grid(grid, organism)
+	truss.point_load(Fy=-100, node_id=truss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT]))
+	truss.solve()
+	loads = list(map(calculate_max_force, truss.get_element_results()))
+	# idxs = np.array([i for i, x in enumerate(loads) if not x])
+	idxs = np.where(loads)[0]
+	organism[idxs] = False
+	return organism
+
 name = "grid_4_6"
+
+def save_organism_figure(organism, fitness, generation, suffix=""):
+	fig = generate_truss_by_grid(grid, organism).show_structure(show=False, verbosity=1)
+	plt.title(f"fitness = {round(fitness, 3)}")
+	fig.savefig(os.path.join("./img", name, f"ga{generation}{suffix}.png"))
 
 def genetic_optimization(population):
 	for generation in range(20):
@@ -413,12 +429,9 @@ def genetic_optimization(population):
 
 		# generate_truss_by_grid(grid, population[max_idx]).show_structure()
 		try:
-			fig = generate_truss_by_grid(grid, population[max_idx]).show_structure(show=False, verbosity=1)
-
 			print(f"fitness = {round(fitness[max_idx], 3)}")
-			plt.title(f"fitness = {round(fitness[max_idx], 3)}")
-
-			fig.savefig(os.path.join("./img", name, f"ga{generation}.png"))
+			save_organism_figure(population[max_idx], fitness[max_idx], generation)
+			save_organism_figure(eliminate_zero_force_members(population[max_idx]), fitness[max_idx], generation, "_nozero")
 			with open(os.path.join("./img", name, "save.pkl"), "wb") as f:
 				pickle.dump(population, f)
 		except AttributeError:

@@ -341,12 +341,6 @@ def generate_valid_truss(grid):
 print("generating initial population...")
 truss_population = [generate_valid_truss(grid) for _ in range(40)]
 
-# def mutate(organism):
-# 	toggle_idxs = np.random.randint(0, len(organism), math.floor(len(organism) * 0.0075))
-# 	for idx in toggle_idxs:
-# 		organism[idx] = not organism[idx]
-# 	return organism
-
 def mutate(pop, mutation_rate=0.008):
 	"""
 	Vectorized random mutations.
@@ -429,7 +423,6 @@ def genetic_optimization(population):
 		fitness = np.array(fitness)
 		max_idx = np.argmax(fitness)
 
-		# generate_truss_by_grid(grid, population[max_idx]).show_structure()
 		try:
 			print(f"fitness = {round(fitness[max_idx], 3)}")
 			save_organism_figure(population[max_idx], fitness[max_idx], generation)

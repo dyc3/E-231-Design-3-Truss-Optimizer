@@ -11,6 +11,7 @@ import os, pickle
 from itertools import combinations
 from scipy.spatial.distance import euclidean
 from multiprocessing import Pool
+import argparse
 
 # trusses must span 15 inches, and there must be a connection at the top center of the truss
 # member length must not exceed 72 inches, as 2 lengths of 36 inches
@@ -21,6 +22,14 @@ from multiprocessing import Pool
 
 # extra credit: +2
 # 6:1 strength to weight ratio
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--generations', type=int, default=20)
+parser.add_argument('--population-size', type=int, default=40)
+parser.add_argument('--hyper-connected', default=False, action='store_true')
+args = parser.parse_args()
+
+print(args)
 
 MIN_WIDTH = 15
 MAX_HEIGHT = 4
@@ -381,6 +390,7 @@ def score_truss(truss, silent=False):
 	max_load = check_max_load(truss)
 	if not silent:
 		print(f"all members: {total_member_length} in, {material_weight:.2f} lbs, holds max load {max_load}, {num_hanging_members} hanging members")
+	# return max_load / material_weight * ((total_member_length < 72) * 2 + 1)
 	return max_load / material_weight * ((total_member_length < 72) * 2 + 1)
 
 # for mode in ["triangle_subdivide", "radial_subdivide", "pillar_subdivide"]:
@@ -391,7 +401,7 @@ def score_truss(truss, silent=False):
 # 		print(f"truss {mode}/{subdivides} valid: {is_valid} score: {score:.1f}")
 
 np.random.seed(42)
-grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH / 2, 4, 3, hyper_connected=True)
+grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH / 2, 4, 3, hyper_connected=args.hyper_connected)
 
 # truss = generate_truss_by_grid(grid, ([True, True, False] * 5000)[:len(grid)])
 # truss.show_structure()
@@ -402,18 +412,18 @@ def generate_valid_truss(grid):
 	while not truss or not is_truss_valid(truss):
 		attempt += 1
 		# print(f"{attempt}   ", end="\r")
-		members = np.random.rand(len(grid)) < 0.06
-		members = optimize_2_connection_nodes(grid, members)
+		members = np.random.rand(len(grid)) < (0.06 if args.hyper_connected else 0.7)
+		if args.hyper_connected:
+			members = optimize_2_connection_nodes(grid, members)
 		truss = generate_truss_by_grid(grid, members)
 		if truss and not truss.find_node_id(vertex=[MIN_WIDTH / 2, MAX_HEIGHT]):
 			truss = None
 	return members
 
 print("generating initial population...")
-POPULATION_SIZE = 40
 truss_population = None
 with Pool() as p:
-	truss_population = list(tqdm(p.imap(generate_valid_truss, [grid] * POPULATION_SIZE), total=POPULATION_SIZE))
+	truss_population = list(tqdm(p.imap(generate_valid_truss, [grid] * args.population_size), total=args.population_size))
 
 def mutate(pop, mutation_rate=0.008):
 	"""
@@ -489,7 +499,7 @@ def save_organism_figure(organism, fitness, generation, suffix=""):
 	fig.savefig(os.path.join("./img", name, f"ga{generation}{suffix}.png"))
 
 def genetic_optimization(population):
-	for generation in range(20):
+	for generation in range(args.generations):
 		print(f"GENERATION {generation}")
 		fitness = []
 		for organism in tqdm(population):

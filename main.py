@@ -12,7 +12,7 @@ from itertools import combinations
 from scipy.spatial.distance import euclidean
 from multiprocessing import Pool
 import argparse
-from scipy.io import loadmat
+from scipy.io import loadmat, savemat
 import os
 
 # trusses must span 15 inches, and there must be a connection at the top center of the truss
@@ -476,8 +476,37 @@ def load_truss_from_file(mat_file_path):
 	truss.add_support_hinged(node_id=truss.find_node_id(vertex=[MIN_WIDTH, 0]))
 	return truss
 
-def save_truss_for_truss_analyzer(truss):
-	pass
+def save_truss_for_truss_analyzer(truss, math_file_path):
+	left_node_id = truss.find_node_id(vertex=[0, 0])
+	right_node_id = truss.find_node_id(vertex=[MIN_WIDTH, 0])
+	nodes = [None] * len(truss.node_map)
+	elements = [None] * len(truss.element_map)
+	for node_id in truss.node_map:
+		nodes[node_id - 1] = truss.node_map[node_id].vertex.coordinates
+	if left_node_id > 2:
+		nodes[0], nodes[left_node_id - 1] = nodes[left_node_id - 1], nodes[0]
+	if right_node_id > 2:
+		nodes[1], nodes[right_node_id - 1] = nodes[right_node_id - 1], nodes[1]
+	nodes = np.array(nodes)
+	for element_id in truss.element_map:
+		point1 = truss.element_map[element_id].node_1.vertex.coordinates
+		point2 = truss.element_map[element_id].node_2.vertex.coordinates
+		point1idx = -1
+		point2idx = -1
+		for i, node in enumerate(nodes):
+			if np.array_equal(node, point1):
+				point1idx = i
+				break
+		for i, node in enumerate(nodes):
+			if np.array_equal(node, point2):
+				point2idx = i
+				break
+		elements[element_id - 1] = [point1idx, point2idx]
+	savemat(math_file_path, {
+		"nodes": np.array(nodes) + [1, 3],
+		"elements": np.array(elements) + 1,
+		"loads": []
+	}, appendmat=False)
 
 # ss = generate_truss("radial_subdivide", 2)
 # ss.point_load(Fy=-500, node_id=ss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT]))
@@ -546,10 +575,10 @@ def score_truss(truss, silent=False):
 
 if args.score_truss:
 	truss = load_truss_from_file(args.score_truss)
-	if args.show_trusses:
-		truss.show_structure()
 	print(f'valid: {is_truss_valid(truss)}')
 	print(f'score: {score_truss(truss)}')
+	if args.show_trusses:
+		truss.show_structure()
 	os._exit(0)
 
 np.random.seed(42)
@@ -652,6 +681,13 @@ def eliminate_zero_force_members(organism):
 
 name = "grid_4_6"
 
+if not os.path.exists("trusses"):
+	os.mkdir("trusses")
+if not os.path.exists("img"):
+	os.mkdir("img")
+if not os.path.exists("img/" + name):
+	os.mkdir("img/" + name)
+
 def save_organism_figure(organism, fitness, generation, suffix=""):
 	fig = generate_truss_by_grid(grid, organism).show_structure(show=False, verbosity=1)
 	plt.title(f"fitness = {round(fitness, 3)}")
@@ -662,8 +698,9 @@ def genetic_optimization(population):
 		print(f"GENERATION {generation}")
 		fitness = []
 		for organism in tqdm(population):
+			truss = generate_truss_by_grid(grid, organism)
 			try:
-				fitness.append(score_truss(generate_truss_by_grid(grid, organism), True))
+				fitness.append(score_truss(truss, True))
 			except np.linalg.LinAlgError:
 				fitness.append(0)
 			except:
@@ -682,6 +719,7 @@ def genetic_optimization(population):
 			# 		os.remove(path)
 			with open(os.path.join("./img", name, "save.pkl"), "wb") as f:
 				pickle.dump(population, f)
+			save_truss_for_truss_analyzer(truss, f"./trusses/gen_{generation}.mat")
 		except AttributeError:
 			pass
 

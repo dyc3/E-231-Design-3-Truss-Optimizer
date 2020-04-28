@@ -681,3 +681,7 @@ for members in genetic_optimization(truss_population):
 		print(f"can't score invalid truss")
 		if args.show_trusses:
 			truss.show_structure()
+	except Exception as e:
+		print(f"can't score: {e}")
+		if args.show_trusses:
+			truss.show_structure()

@@ -265,6 +265,22 @@ def are_members_connected(a, b):
 assert np.array_equal(are_members_connected([[0, 1], [1, 0]], [[1, 0], [2, 1]]), [1, 0])
 assert not are_members_connected([[0, 1], [1, 0]], [[0, 0], [2, 1]])
 
+def do_members_intersect(a, b):
+	"""
+	Returns True if the members intersect
+	a1: [x, y] a point on the first line
+	a2: [x, y] another point on the first line
+	b1: [x, y] a point on the second line
+	b2: [x, y] another point on the second line
+	"""
+	s = np.vstack([a[0],a[1],b[0],b[1]])        # s for stacked
+	h = np.hstack((s, np.ones((4, 1)))) # h for homogeneous
+	l1 = np.cross(h[0], h[1])           # get first line
+	l2 = np.cross(h[2], h[3])           # get second line
+	x, y, z = np.cross(l1, l2)          # point of intersection
+	# if z == 0, lines are parallel
+	return z != 0
+
 def optimize_2_connection_nodes(grid, organism):
 	"""
 	Takes nodes that have 2 connections, and directly connects the end nodes

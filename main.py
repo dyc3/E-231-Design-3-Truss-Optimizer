@@ -12,6 +12,8 @@ from itertools import combinations
 from scipy.spatial.distance import euclidean
 from multiprocessing import Pool
 import argparse
+from scipy.io import loadmat
+import os
 
 # trusses must span 15 inches, and there must be a connection at the top center of the truss
 # member length must not exceed 72 inches, as 2 lengths of 36 inches
@@ -33,6 +35,7 @@ parser.add_argument('--cross-rate', type=float, default=0.5)
 parser.add_argument('--mutation-rate', type=float, default=0.008)
 parser.add_argument('--show-trusses', default=False, action='store_true')
 parser.add_argument('--disable-parallel', dest='parallel', action='store_false')
+parser.add_argument('--score-truss', type=str)
 args = parser.parse_args()
 
 print(args)
@@ -458,6 +461,24 @@ def generate_truss_by_grid(grid, enabled):
 	except:
 		return None
 
+def load_truss_from_file(mat_file_path):
+	"""
+	Loads a truss from the Stevens' Truss Analyzer program
+	"""
+	data = loadmat(mat_file_path)
+	nodes = np.array(data['nodes']) - [1, 3]
+	elements = np.array(data['elements']) - 1
+	truss = SystemElements(EA=MODULUS_OF_ELASTICITY * BRASS_CROSS_SECTION_AREA, EI=MODULUS_OF_ELASTICITY * MOMENT_OF_INERTIA)
+	for elementnodes in elements:
+		member = nodes[elementnodes]
+		truss.add_truss_element(member)
+	truss.add_support_hinged(node_id=truss.find_node_id(vertex=[0, 0]))
+	truss.add_support_hinged(node_id=truss.find_node_id(vertex=[MIN_WIDTH, 0]))
+	return truss
+
+def save_truss_for_truss_analyzer(truss):
+	pass
+
 # ss = generate_truss("radial_subdivide", 2)
 # ss.point_load(Fy=-500, node_id=ss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT]))
 # ss.solve(max_iter=500, geometrical_non_linear=True)
@@ -522,6 +543,14 @@ def score_truss(truss, silent=False):
 # 		is_valid = is_truss_valid(truss)
 # 		score = score_truss(truss)
 # 		print(f"truss {mode}/{subdivides} valid: {is_valid} score: {score:.1f}")
+
+if args.score_truss:
+	truss = load_truss_from_file(args.score_truss)
+	if args.show_trusses:
+		truss.show_structure()
+	print(f'valid: {is_truss_valid(truss)}')
+	print(f'score: {score_truss(truss)}')
+	os._exit(0)
 
 np.random.seed(42)
 grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH / 2, args.grid_size_x, args.grid_size_y, hyper_connected=args.hyper_connected)

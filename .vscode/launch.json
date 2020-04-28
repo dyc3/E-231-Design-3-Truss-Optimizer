@@ -11,6 +11,14 @@
 			"program": "main.py",
 			"console": "integratedTerminal",
 			"args": ["--disable-parallel"],
+		},
+		{
+			"name": "load and score sample truss",
+			"type": "python",
+			"request": "launch",
+			"program": "main.py",
+			"console": "integratedTerminal",
+			"args": ["--score-truss", "./minimum-truss.mat"],
 		}
 	]
 }

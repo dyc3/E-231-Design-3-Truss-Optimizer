@@ -29,6 +29,7 @@ parser.add_argument('--population-size', type=int, default=40)
 parser.add_argument('--hyper-connected', default=False, action='store_true')
 parser.add_argument('--cross-rate', type=float, default=0.5)
 parser.add_argument('--mutation-rate', type=float, default=0.008)
+parser.add_argument('--show-trusses', default=False, action='store_true')
 args = parser.parse_args()
 
 print(args)
@@ -548,6 +549,11 @@ def genetic_optimization(population):
 
 for members in genetic_optimization(truss_population):
 	truss = generate_truss_by_grid(grid, members)
-	# truss.show_structure()
-	print(f"truss score: {score_truss(truss)}")
-	# truss.show_results()
+	try:
+		print(f"truss score: {score_truss(truss)}")
+		if args.show_trusses:
+			truss.show_results()
+	except np.linalg.LinAlgError:
+		print(f"can't score invalid truss")
+		if args.show_trusses:
+			truss.show_structure()

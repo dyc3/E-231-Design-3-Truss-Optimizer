@@ -689,9 +689,11 @@ if not os.path.exists("img/" + name):
 	os.mkdir("img/" + name)
 
 def save_organism_figure(organism, fitness, generation, suffix=""):
-	fig = generate_truss_by_grid(grid, organism).show_structure(show=False, verbosity=1)
+	truss = generate_truss_by_grid(grid, organism)
+	fig = truss.show_structure(show=False, verbosity=1)
 	plt.title(f"fitness = {round(fitness, 3)}")
 	fig.savefig(os.path.join("./img", name, f"ga{generation}{suffix}.png"))
+	save_truss_for_truss_analyzer(truss, f"./trusses/gen_{generation}{suffix}.mat")
 
 def genetic_optimization(population):
 	for generation in range(args.generations):
@@ -719,7 +721,6 @@ def genetic_optimization(population):
 			# 		os.remove(path)
 			with open(os.path.join("./img", name, "save.pkl"), "wb") as f:
 				pickle.dump(population, f)
-			save_truss_for_truss_analyzer(truss, f"./trusses/gen_{generation}.mat")
 		except AttributeError:
 			pass
 

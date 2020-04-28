@@ -229,9 +229,9 @@ def are_members_equal(a, b):
 
 assert are_members_equal([[0, 1], [1, 0]], [[1, 0], [0, 1]])
 
-def optimize_parrallel_members(grid, organism):
+def optimize_2_connection_nodes(grid, organism):
 	"""
-	Takes 2 or more parrallel members that are connected to each other and makes them one log member.
+	Takes nodes that have 2 connections, and directly connects the end nodes
 	Reduces the number of nodes used, and makes it easier to find duplicate members.
 	"""
 	assert len(grid) == len(organism)
@@ -403,7 +403,7 @@ def generate_valid_truss(grid):
 		attempt += 1
 		# print(f"{attempt}   ", end="\r")
 		members = np.random.rand(len(grid)) < 0.06
-		members = optimize_parrallel_members(grid, members)
+		members = optimize_2_connection_nodes(grid, members)
 		truss = generate_truss_by_grid(grid, members)
 		if truss and not truss.find_node_id(vertex=[MIN_WIDTH / 2, MAX_HEIGHT]):
 			truss = None

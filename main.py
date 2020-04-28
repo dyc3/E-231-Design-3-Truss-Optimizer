@@ -527,17 +527,17 @@ def genetic_optimization(population):
 			pass
 
 		pop = copy.deepcopy(rank_selection(population, fitness))
-		while True:
+		valid_pop = []
+		while len(valid_pop) < len(population):
 			new_population = mutate(crossover(pop))
-			is_pop_valid = True
-			for members in new_population:
-				truss = generate_truss_by_grid(grid, members)
-				if not truss or not truss.find_node_id(vertex=[MIN_WIDTH / 2, MAX_HEIGHT]):
-					is_pop_valid = False
-					break
-			if is_pop_valid:
-				population = new_population
-				break
+			for organism in new_population:
+				truss = generate_truss_by_grid(grid, organism)
+				if truss and truss.find_node_id(vertex=[MIN_WIDTH / 2, MAX_HEIGHT]):
+					valid_pop.append(organism)
+					if len(valid_pop) >= len(population):
+						break
+			print(f"\r mutating {len(valid_pop)}/{len(population)}   ", end="")
+		population = np.array(valid_pop)
 
 	return population
 

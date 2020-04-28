@@ -65,6 +65,8 @@ def collinear(x1, y1, x2, y2, x3, y3):
 	return (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)) == 0
 
 def slope(x1, y1, x2, y2):
+	if x2 - x1 == 0:
+		return float('inf')
 	return (y2 - y1) / (x2 - x1)
 
 class Truss:
@@ -241,6 +243,11 @@ def generate_truss_grid(height, width, grid_size_x, grid_size_y, hyper_connected
 	else:
 		comb = np.array(list(filter(lambda x: euclidean(all_grid_points[x[1]], all_grid_points[x[0]]) <= max_dist, combinations(range(len(all_grid_points)), 2))))
 		all_possible_members = list(map(lambda idx: [all_grid_points[idx[0]], all_grid_points[idx[1]]], comb))
+
+	# verify there are no zero length members
+	for member in all_possible_members:
+		assert euclidean(*member) > 0
+
 	return np.array(all_possible_members)
 
 def are_members_equal(a, b):
@@ -252,10 +259,10 @@ def are_members_connected(a, b):
 	for pointA in a:
 		for pointB in b:
 			if np.array_equal(pointA, pointB):
-				return True
+				return pointA
 	return False
 
-assert are_members_connected([[0, 1], [1, 0]], [[1, 0], [2, 1]])
+assert np.array_equal(are_members_connected([[0, 1], [1, 0]], [[1, 0], [2, 1]]), [1, 0])
 assert not are_members_connected([[0, 1], [1, 0]], [[0, 0], [2, 1]])
 
 def optimize_2_connection_nodes(grid, organism):
@@ -310,13 +317,6 @@ def optimize_2_connection_nodes(grid, organism):
 		organism[new_member_idx] = True
 	return organism
 
-def optimize_colinear_members(members):
-	members_by_slope = {}
-	for member in members:
-		s = round(slope(*member.flatten()), 4)
-		members_by_slope[s] = member
-	return members
-
 def exclude_duplicate_members(members):
 	"""
 	Remove duplicate members
@@ -331,6 +331,84 @@ def exclude_duplicate_members(members):
 		if not is_duplicate:
 			lines.append(line)
 	return lines
+
+def optimize_colinear_members(members):
+	# members_by_slope = {}
+	# for i, member in enumerate(members):
+	# 	s = round(slope(*member.flatten()), 4)
+	# 	if s not in members_by_slope:
+	# 		members_by_slope[s] = []
+	# 	members_by_slope[s].append((i, member))
+
+	# for s in members_by_slope:
+	# 	member_group = members_by_slope[s]
+	# 	for a_i, a in member_group:
+	# 		for b_i, b in member_group:
+	# 			if are_members_equal(a, b):
+	# 				continue
+	# 			shared_point = are_members_connected(a, b)
+	# 			if not np.any(shared_point):
+	# 				continue
+	# 			new_member = np.array(list(filter(lambda x: not np.array_equal(x, shared_point), list(a) + list(b))))
+	# 			if new_member.shape == (2, 2):
+	# 				members[a_i] = new_member
+	# 				members[b_i] = None
+
+	# return np.array(list(filter(lambda x: not np.any(np.isnan(x)), members)))
+	# return members[~np.isnan(members)].reshape(-1, 2, 2)
+
+	# for a_i, a in enumerate(members):
+	# 	for b_i, b in enumerate(members):
+	# 		if are_members_equal(a, b):
+	# 			continue
+	# 		shared_point = are_members_connected(a, b)
+	# 		# make sure no other members are connected to this point
+	# 		num_connections = 0
+	# 		for c in members.reshape(-1, 2):
+	# 			if np.array_equal(c, shared_point):
+	# 				num_connections += 1
+	# 			if num_connections > 2:
+	# 				break
+	# 		if num_connections != 2:
+	# 			continue
+	# 		new_member = np.array(list(filter(lambda x: not np.array_equal(x, shared_point), list(a) + list(b))))
+	# 		if new_member.shape == (2, 2):
+	# 			members[a_i] = new_member
+	# 			members[b_i] = None
+
+	# # return np.array(list(filter(lambda x: not np.any(np.isnan(x)), members)))
+	# return members[~np.isnan(members)].reshape(-1, 2, 2)
+
+	new_members = []
+	for a_i, a in enumerate(members):
+		for b_i, b in enumerate(members):
+			if are_members_equal(a, b):
+				continue
+			shared_point = are_members_connected(a, b)
+			# make sure no other members are connected to this point
+			num_connections = 0
+			for c in members.reshape(-1, 2):
+				if np.array_equal(c, shared_point):
+					num_connections += 1
+				if num_connections > 2:
+					break
+			if num_connections != 2:
+				continue
+			new_member = np.array(list(filter(lambda x: not np.array_equal(x, shared_point), list(a) + list(b))))
+			if new_member.shape == (2, 2):
+				members[a_i] = None
+				members[b_i] = None
+				new_members.append(new_member)
+
+	# return np.array(list(filter(lambda x: not np.any(np.isnan(x)), members)))
+	if len(new_members) > 0:
+		return np.concatenate((members[~np.isnan(members)].reshape(-1, 2, 2), np.array(new_members)), axis=0)
+	else:
+		return members
+
+# _test_optimize = optimize_colinear_members(np.array([ [[0, 0], [1, 0]], [[2, 0], [1, 0]] ]))
+_test_optimize = optimize_colinear_members(np.array([ [[0, 0], [1, 0]], [[1, 0], [2, 0]] ], dtype="float64"))
+assert len(_test_optimize) == 1
 
 def generate_truss_by_grid(grid, enabled):
 	"""
@@ -549,12 +627,12 @@ def genetic_optimization(population):
 		try:
 			print(f"fitness = {round(fitness[max_idx], 3)}")
 			save_organism_figure(population[max_idx], fitness[max_idx], generation)
-			try:
-				save_organism_figure(eliminate_zero_force_members(population[max_idx]), fitness[max_idx], generation, "_nozero")
-			except np.linalg.LinAlgError:
-				path = os.path.join("./img", name, f"ga{generation}_nozero.png")
-				if os.path.exists(path):
-					os.remove(path)
+			# try:
+			# 	save_organism_figure(eliminate_zero_force_members(population[max_idx]), fitness[max_idx], generation, "_nozero")
+			# except np.linalg.LinAlgError:
+			# 	path = os.path.join("./img", name, f"ga{generation}_nozero.png")
+			# 	if os.path.exists(path):
+			# 		os.remove(path)
 			with open(os.path.join("./img", name, "save.pkl"), "wb") as f:
 				pickle.dump(population, f)
 		except AttributeError:

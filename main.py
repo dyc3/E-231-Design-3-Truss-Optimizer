@@ -27,6 +27,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--generations', type=int, default=20)
 parser.add_argument('--population-size', type=int, default=40)
 parser.add_argument('--hyper-connected', default=False, action='store_true')
+parser.add_argument('--cross-rate', type=float, default=0.5)
+parser.add_argument('--mutation-rate', type=float, default=0.008)
 args = parser.parse_args()
 
 print(args)
@@ -425,7 +427,7 @@ truss_population = None
 with Pool() as p:
 	truss_population = list(tqdm(p.imap(generate_valid_truss, [grid] * args.population_size), total=args.population_size))
 
-def mutate(pop, mutation_rate=0.008):
+def mutate(pop, mutation_rate=args.mutation_rate):
 	"""
 	Vectorized random mutations.
 	:param pop: (array)
@@ -437,7 +439,7 @@ def mutate(pop, mutation_rate=0.008):
 	pop[idx] = val
 	return pop
 
-def crossover(pop, cross_rate=0.5):
+def crossover(pop, cross_rate=args.cross_rate):
 	"""
 	Vectorized crossover
 	:param pop: (array)

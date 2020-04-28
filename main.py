@@ -410,9 +410,10 @@ def generate_valid_truss(grid):
 	return members
 
 print("generating initial population...")
+POPULATION_SIZE = 40
 truss_population = None
 with Pool() as p:
-	truss_population = p.map(generate_valid_truss, [grid] * 40)
+	truss_population = list(tqdm(p.imap(generate_valid_truss, [grid] * POPULATION_SIZE), total=POPULATION_SIZE))
 
 def mutate(pop, mutation_rate=0.008):
 	"""

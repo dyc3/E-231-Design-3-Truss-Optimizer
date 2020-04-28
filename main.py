@@ -392,7 +392,6 @@ def score_truss(truss, silent=False):
 	max_load = check_max_load(truss)
 	if not silent:
 		print(f"all members: {total_member_length} in, {material_weight:.2f} lbs, holds max load {max_load}, {num_hanging_members} hanging members")
-	# return max_load / material_weight * ((total_member_length < 72) * 2 + 1)
 	return max_load / material_weight * ((total_member_length < 72) * 2 + 1)
 
 # for mode in ["triangle_subdivide", "radial_subdivide", "pillar_subdivide"]:
@@ -403,7 +402,7 @@ def score_truss(truss, silent=False):
 # 		print(f"truss {mode}/{subdivides} valid: {is_valid} score: {score:.1f}")
 
 np.random.seed(42)
-grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH / 2, 4, 3, hyper_connected=args.hyper_connected)
+grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH / 2, 3, 3, hyper_connected=args.hyper_connected)
 
 # truss = generate_truss_by_grid(grid, ([True, True, False] * 5000)[:len(grid)])
 # truss.show_structure()
@@ -414,7 +413,7 @@ def generate_valid_truss(grid):
 	while not truss or not is_truss_valid(truss):
 		attempt += 1
 		# print(f"{attempt}   ", end="\r")
-		members = np.random.rand(len(grid)) < (0.06 if args.hyper_connected else 0.7)
+		members = np.random.rand(len(grid)) < (0.06 if args.hyper_connected else 0.4)
 		if args.hyper_connected:
 			members = optimize_2_connection_nodes(grid, members)
 		truss = generate_truss_by_grid(grid, members)
@@ -483,6 +482,10 @@ def rank_selection(pop, fitness):
 def eliminate_zero_force_members(organism):
 	organism = copy.deepcopy(organism)
 	truss = generate_truss_by_grid(grid, organism)
+	if not truss:
+		return organism
+	if not truss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT]):
+		return organism
 	truss.point_load(Fy=-100, node_id=truss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT]))
 	truss.solve()
 	member_idxs = np.where(organism)[0]
@@ -508,6 +511,8 @@ def genetic_optimization(population):
 			try:
 				fitness.append(score_truss(generate_truss_by_grid(grid, organism), True))
 			except np.linalg.LinAlgError:
+				fitness.append(0)
+			except:
 				fitness.append(0)
 		fitness = np.array(fitness)
 		max_idx = np.argmax(fitness)

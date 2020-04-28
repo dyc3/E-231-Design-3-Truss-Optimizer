@@ -10,6 +10,7 @@ from tqdm import tqdm
 import os, pickle
 from itertools import combinations
 from scipy.spatial.distance import euclidean
+from multiprocessing import Pool
 
 # trusses must span 15 inches, and there must be a connection at the top center of the truss
 # member length must not exceed 72 inches, as 2 lengths of 36 inches
@@ -400,7 +401,7 @@ def generate_valid_truss(grid):
 	attempt = 0
 	while not truss or not is_truss_valid(truss):
 		attempt += 1
-		print(f"{attempt}   ", end="\r")
+		# print(f"{attempt}   ", end="\r")
 		members = np.random.rand(len(grid)) < 0.06
 		members = optimize_parrallel_members(grid, members)
 		truss = generate_truss_by_grid(grid, members)
@@ -409,7 +410,9 @@ def generate_valid_truss(grid):
 	return members
 
 print("generating initial population...")
-truss_population = [generate_valid_truss(grid) for _ in range(40)]
+truss_population = None
+with Pool() as p:
+	truss_population = p.map(generate_valid_truss, [grid] * 40)
 
 def mutate(pop, mutation_rate=0.008):
 	"""

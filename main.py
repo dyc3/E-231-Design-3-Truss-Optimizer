@@ -26,6 +26,8 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--generations', type=int, default=20)
 parser.add_argument('--population-size', type=int, default=40)
+parser.add_argument('--grid-size-x', type=int, default=3)
+parser.add_argument('--grid-size-y', type=int, default=3)
 parser.add_argument('--hyper-connected', default=False, action='store_true')
 parser.add_argument('--cross-rate', type=float, default=0.5)
 parser.add_argument('--mutation-rate', type=float, default=0.008)
@@ -522,7 +524,7 @@ def score_truss(truss, silent=False):
 # 		print(f"truss {mode}/{subdivides} valid: {is_valid} score: {score:.1f}")
 
 np.random.seed(42)
-grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH / 2, 3, 3, hyper_connected=args.hyper_connected)
+grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH / 2, args.grid_size_x, args.grid_size_y, hyper_connected=args.hyper_connected)
 
 # truss = generate_truss_by_grid(grid, ([True, True, False] * 5000)[:len(grid)])
 # truss.show_structure()

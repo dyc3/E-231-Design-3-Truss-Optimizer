@@ -518,7 +518,9 @@ def genetic_optimization(population):
 			try:
 				save_organism_figure(eliminate_zero_force_members(population[max_idx]), fitness[max_idx], generation, "_nozero")
 			except np.linalg.LinAlgError:
-				pass
+				path = os.path.join("./img", name, f"ga{generation}_nozero.png")
+				if os.path.exists(path):
+					os.remove(path)
 			with open(os.path.join("./img", name, "save.pkl"), "wb") as f:
 				pickle.dump(population, f)
 		except AttributeError:

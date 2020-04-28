@@ -30,6 +30,7 @@ parser.add_argument('--hyper-connected', default=False, action='store_true')
 parser.add_argument('--cross-rate', type=float, default=0.5)
 parser.add_argument('--mutation-rate', type=float, default=0.008)
 parser.add_argument('--show-trusses', default=False, action='store_true')
+parser.add_argument('--disable-parallel', dest='parallel', action='store_false')
 args = parser.parse_args()
 
 print(args)
@@ -59,6 +60,12 @@ def valmap(value, istart, istop, ostart, ostop):
 
 def lbsToN(lbs):
 	return lbs * 4.4482216282509
+
+def collinear(x1, y1, x2, y2, x3, y3):
+	return (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)) == 0
+
+def slope(x1, y1, x2, y2):
+	return (y2 - y1) / (x2 - x1)
 
 class Truss:
 	def __init__(self):
@@ -241,6 +248,16 @@ def are_members_equal(a, b):
 
 assert are_members_equal([[0, 1], [1, 0]], [[1, 0], [0, 1]])
 
+def are_members_connected(a, b):
+	for pointA in a:
+		for pointB in b:
+			if np.array_equal(pointA, pointB):
+				return True
+	return False
+
+assert are_members_connected([[0, 1], [1, 0]], [[1, 0], [2, 1]])
+assert not are_members_connected([[0, 1], [1, 0]], [[0, 0], [2, 1]])
+
 def optimize_2_connection_nodes(grid, organism):
 	"""
 	Takes nodes that have 2 connections, and directly connects the end nodes
@@ -293,6 +310,13 @@ def optimize_2_connection_nodes(grid, organism):
 		organism[new_member_idx] = True
 	return organism
 
+def optimize_colinear_members(members):
+	members_by_slope = {}
+	for member in members:
+		s = round(slope(*member.flatten()), 4)
+		members_by_slope[s] = member
+	return members
+
 def exclude_duplicate_members(members):
 	"""
 	Remove duplicate members
@@ -327,6 +351,7 @@ def generate_truss_by_grid(grid, enabled):
 			point[0] *= -1
 			point[0] += width * 2
 	members = np.append(members, members_mirror, axis=0)
+	members = optimize_colinear_members(members)
 	truss = SystemElements(EA=MODULUS_OF_ELASTICITY * BRASS_CROSS_SECTION_AREA, EI=MODULUS_OF_ELASTICITY * MOMENT_OF_INERTIA)
 	for member in members:
 		truss.add_truss_element(member)
@@ -424,8 +449,11 @@ def generate_valid_truss(grid):
 
 print("generating initial population...")
 truss_population = None
-with Pool() as p:
-	truss_population = list(tqdm(p.imap(generate_valid_truss, [grid] * args.population_size), total=args.population_size))
+if args.parallel:
+	with Pool() as p:
+		truss_population = list(tqdm(p.imap(generate_valid_truss, [grid] * args.population_size), total=args.population_size))
+else:
+	truss_population = list(tqdm(map(generate_valid_truss, [grid] * args.population_size), total=args.population_size))
 
 def mutate(pop, mutation_rate=args.mutation_rate):
 	"""

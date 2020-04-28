@@ -145,14 +145,7 @@ def generate_truss(subdivide_mode=None, subdivides=None):
 		# sort lines by first point's x value
 		raw_lines = sorted(raw_lines, key=lambda l: l[0][0])
 		# remove duplicate lines
-		lines = []
-		for line in raw_lines:
-			is_duplicate = False
-			for l in lines:
-				if np.array_equal(line, l):
-					is_duplicate = True
-			if not is_duplicate:
-				lines.append(line)
+		lines = exclude_duplicate_members(raw_lines)
 		for line in lines:
 			ss.add_truss_element(location=line)
 	elif subdivide_mode == "radial_subdivide":
@@ -213,7 +206,7 @@ def generate_truss(subdivide_mode=None, subdivides=None):
 	ss.add_support_hinged(node_id=ss.find_node_id(vertex=[width, 0]))
 	return ss
 
-def generate_truss_grid(height, width, grid_size_x, grid_size_y, hyper_connected=False, exclude_known_useless=False):
+def generate_truss_grid(height, width, grid_size_x, grid_size_y, hyper_connected=False, exclude_known_useless=True):
 	all_grid_points = np.array(np.meshgrid(np.arange(0, width + 0.01, width / grid_size_x), np.arange(0, height + 0.01, height / grid_size_y))).T.reshape(-1, 2)
 	max_dist = euclidean([0, 0], [width / grid_size_x, height / grid_size_y]) + 0.01
 	if exclude_known_useless:
@@ -222,13 +215,85 @@ def generate_truss_grid(height, width, grid_size_x, grid_size_y, hyper_connected
 	if hyper_connected:
 		for point1 in all_grid_points:
 			for point2 in all_grid_points:
-				if np.array_equal(point1, point2):
+				if euclidean(point1, point2) < 1e-3:
 					continue
 				all_possible_members.append([point1, point2])
 	else:
 		comb = np.array(list(filter(lambda x: euclidean(all_grid_points[x[1]], all_grid_points[x[0]]) <= max_dist, combinations(range(len(all_grid_points)), 2))))
 		all_possible_members = list(map(lambda idx: [all_grid_points[idx[0]], all_grid_points[idx[1]]], comb))
 	return np.array(all_possible_members)
+
+def are_members_equal(a, b):
+	return np.allclose(sorted(a, key=lambda p: p[0]), sorted(b, key=lambda p: p[0]))
+
+assert are_members_equal([[0, 1], [1, 0]], [[1, 0], [0, 1]])
+
+def optimize_parrallel_members(grid, organism):
+	"""
+	Takes 2 or more parrallel members that are connected to each other and makes them one log member.
+	Reduces the number of nodes used, and makes it easier to find duplicate members.
+	"""
+	assert len(grid) == len(organism)
+	members = grid[organism]
+	# because im lazy, let anastruct do the thinking
+	truss = SystemElements()
+	for member in members:
+		truss.add_truss_element(member)
+	assert len(members) == len(truss.element_map.values())
+	two_connection_nodes = [truss.node_map[node_id] for node_id, connections in truss.node_element_map.items() if len(connections) == 2]
+
+	for node in two_connection_nodes:
+		elements = list(node.elements.values())
+		connected_nodes = [
+			elements[0].node_id1,
+			elements[0].node_id2,
+			elements[1].node_id1,
+			elements[1].node_id2,
+		]
+		shortcut_member_nodes = [truss.node_map[node_id] for node_id in connected_nodes if node_id != node.id]
+		shortcut_member = [node.vertex.coordinates for node in shortcut_member_nodes]
+		if euclidean(*shortcut_member) < 1e-3:
+			continue
+		old_member_idx1 = -1
+		old_member_idx2 = -1
+		new_member_idx = -1
+		for i, member in enumerate(grid):
+			if old_member_idx1 >= 0 and old_member_idx2 >= 0 and new_member_idx >= 0:
+				break
+			if are_members_equal(shortcut_member, member):
+				new_member_idx = i
+				continue
+			if not organism[i]:
+				continue
+			if are_members_equal([elements[0].vertex_1.coordinates, elements[0].vertex_2.coordinates], member):
+				old_member_idx1 = i
+				continue
+			if are_members_equal([elements[1].vertex_1.coordinates, elements[1].vertex_2.coordinates], member):
+				old_member_idx2 = i
+				continue
+		if old_member_idx1 == old_member_idx2:
+			continue
+		if new_member_idx == -1:
+			raise Exception("member not found")
+		organism[old_member_idx1] = False
+		organism[old_member_idx2] = False
+		organism[new_member_idx] = True
+	return organism
+
+def exclude_duplicate_members(members):
+	"""
+	Remove duplicate members
+	"""
+	lines = []
+	for line in members:
+		is_duplicate = False
+		for l in lines:
+			if np.array_equal(line, l):
+				is_duplicate = True
+				break
+		if not is_duplicate:
+			lines.append(line)
+	return lines
 
 def generate_truss_by_grid(grid, enabled):
 	"""
@@ -239,7 +304,7 @@ def generate_truss_by_grid(grid, enabled):
 	height = MAX_HEIGHT
 	all_possible_members = grid
 	# print(f"number of possible members: {len(all_possible_members)}")
-	assert len(all_possible_members) == len(enabled)
+	# assert len(all_possible_members) == len(enabled)
 	members = all_possible_members[enabled]
 	# print(f"members selected: {len(members)}")
 	# mirror the members to the right side
@@ -306,6 +371,7 @@ def score_truss(truss, silent=False):
 	member_lengths = [element.l for element in truss.element_map.values()]
 	total_member_length = sum(member_lengths)
 	material_weight = BRASS_CROSS_SECTION_AREA * total_member_length * BRASS_DENSITY
+	num_hanging_members = sum([1 for connections in truss.node_element_map.values() if len(connections) == 1])
 
 	load_node_id = truss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT])
 	load_range_min, load_range_max = MIN_POSSIBLE_LOAD, MAX_POSSIBLE_LOAD
@@ -313,7 +379,7 @@ def score_truss(truss, silent=False):
 	truss.solve(max_iter=500)
 	max_load = check_max_load(truss)
 	if not silent:
-		print(f"all members: {total_member_length} in, {material_weight:.2f} lbs, holds max load {max_load}")
+		print(f"all members: {total_member_length} in, {material_weight:.2f} lbs, holds max load {max_load}, {num_hanging_members} hanging members")
 	return max_load / material_weight * ((total_member_length < 72) * 2 + 1)
 
 # for mode in ["triangle_subdivide", "radial_subdivide", "pillar_subdivide"]:
@@ -324,15 +390,19 @@ def score_truss(truss, silent=False):
 # 		print(f"truss {mode}/{subdivides} valid: {is_valid} score: {score:.1f}")
 
 np.random.seed(42)
-grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH / 2, 4, 3, hyper_connected=False)
+grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH / 2, 4, 3, hyper_connected=True)
 
 # truss = generate_truss_by_grid(grid, ([True, True, False] * 5000)[:len(grid)])
 # truss.show_structure()
 
 def generate_valid_truss(grid):
 	truss = members = None
+	attempt = 0
 	while not truss or not is_truss_valid(truss):
-		members = np.random.rand(len(grid)) < 0.5 # < 0.03
+		attempt += 1
+		print(f"{attempt}   ", end="\r")
+		members = np.random.rand(len(grid)) < 0.06
+		members = optimize_parrallel_members(grid, members)
 		truss = generate_truss_by_grid(grid, members)
 		if truss and not truss.find_node_id(vertex=[MIN_WIDTH / 2, MAX_HEIGHT]):
 			truss = None

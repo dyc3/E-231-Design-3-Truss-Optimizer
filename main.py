@@ -523,7 +523,7 @@ def is_truss_valid(truss):
 	return len(truss.element_map.values()) >= 2 * len(truss.node_map.values()) - 4
 
 def calculate_max_force(member):
-	force = member['N']
+	force = -member['N']
 
 	if force > 0:
 		if member['length'] < JOHNSON_EULER_TRANSITION_lENGTH:
@@ -543,7 +543,7 @@ def calculate_max_force(member):
 				(END_CONDITION_FACTOR * member['length']) ** 2
 			)
 
-		return force / max_load
+		return max_load / force
 	else:
 		return False
 

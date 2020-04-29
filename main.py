@@ -730,7 +730,7 @@ def genetic_optimization(population):
 			new_population = mutate(crossover(pop))
 			for organism in new_population:
 				truss = generate_truss_by_grid(grid, organism)
-				if truss and truss.find_node_id(vertex=[MIN_WIDTH / 2, MAX_HEIGHT]):
+				if truss and truss.find_node_id(vertex=[MIN_WIDTH / 2, MAX_HEIGHT]) and is_truss_valid(truss):
 					valid_pop.append(organism)
 					if len(valid_pop) >= len(population):
 						break

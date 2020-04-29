@@ -735,6 +735,7 @@ def genetic_optimization(population):
 					if len(valid_pop) >= len(population):
 						break
 			print(f"\r mutating {len(valid_pop)}/{len(population)}   ", end="")
+		print("done")
 		population = np.array(valid_pop)
 
 	return population

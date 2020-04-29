@@ -418,6 +418,8 @@ def optimize_colinear_members(members):
 			if are_members_equal(a, b):
 				continue
 			shared_point = are_members_connected(a, b)
+			if np.array_equal(shared_point, [0, 0]) or np.array_equal(shared_point, [MIN_WIDTH, 0]) or np.array_equal(shared_point, [MIN_WIDTH / 2, MAX_HEIGHT]):
+				continue
 			# make sure no other members are connected to this point
 			num_connections = 0
 			for c in members.reshape(-1, 2):

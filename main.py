@@ -249,9 +249,14 @@ def generate_truss_grid(height, width, grid_size_x, grid_size_y, hyper_connected
 		comb = np.array(list(filter(lambda x: euclidean(all_grid_points[x[1]], all_grid_points[x[0]]) <= max_dist, combinations(range(len(all_grid_points)), 2))))
 		all_possible_members = list(map(lambda idx: [all_grid_points[idx[0]], all_grid_points[idx[1]]], comb))
 
-	# verify there are no zero length members
+	# verify there are no zero length members, and no duplicate members
 	for member in all_possible_members:
 		assert euclidean(*member) > 0
+		count = 0
+		for memberb in all_possible_members:
+			if are_members_equal(memberb, member):
+				count += 1
+			assert count <= 1
 
 	return np.array(all_possible_members)
 

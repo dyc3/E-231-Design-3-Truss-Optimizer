@@ -248,9 +248,9 @@ def generate_truss_grid(height, width, grid_size_x, grid_size_y, hyper_connected
 	else:
 		def is_adjacent(a, b):
 			if a[0] == b[0]:
-				return abs(a[1] - b[1]) <= height / grid_size_y
+				return abs(a[1] - b[1]) <= height / grid_size_y + 0.01
 			if a[1] == b[1]:
-				return abs(a[0] - b[0]) <= width / grid_size_x
+				return abs(a[0] - b[0]) <= width / grid_size_x + 0.01
 			return euclidean(a, b) <= max_dist
 		comb = np.array(list(filter(lambda x: is_adjacent(all_grid_points[x[1]], all_grid_points[x[0]]), combinations(range(len(all_grid_points)), 2))))
 		all_possible_members = list(map(lambda idx: [all_grid_points[idx[0]], all_grid_points[idx[1]]], comb))

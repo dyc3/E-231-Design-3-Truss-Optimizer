@@ -458,10 +458,10 @@ def generate_truss_by_grid(grid, enabled):
 	# members = optimize_colinear_members(members)
 	# mirror the members to the right side
 	members_mirror = np.copy(members)
-	for member in members_mirror:
-		for point in member:
-			point[0] *= -1
-			point[0] += width * 2
+	members_x, members_y = members_mirror[:,:,[True, False]], members_mirror[:,:,[False, True]]
+	members_x *= -1
+	members_x += width * 2
+	members_mirror = np.append(members_x, members_y, axis=2)
 	members = np.append(members, members_mirror, axis=0)
 	# members = exclude_duplicate_members(members)
 	truss = SystemElements(EA=MODULUS_OF_ELASTICITY * BRASS_CROSS_SECTION_AREA, EI=MODULUS_OF_ELASTICITY * MOMENT_OF_INERTIA)

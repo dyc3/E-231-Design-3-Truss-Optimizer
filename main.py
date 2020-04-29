@@ -536,7 +536,7 @@ def is_truss_valid(truss):
 	# for node_id in truss.node_element_map:
 	# 	if len(truss.node_element_map[node_id]) < 2:
 	# 		return False
-	return len(truss.element_map.values()) == 2 * len(truss.node_map.values()) - 4
+	return len(truss.element_map.values()) == 2 * len(truss.node_map.values()) - 3
 
 def calculate_max_force(member):
 	force = -member['N']

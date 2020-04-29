@@ -346,7 +346,7 @@ def exclude_duplicate_members(members):
 	for line in members:
 		is_duplicate = False
 		for l in lines:
-			if np.array_equal(line, l):
+			if are_members_equal(line, l):
 				is_duplicate = True
 				break
 		if not is_duplicate:

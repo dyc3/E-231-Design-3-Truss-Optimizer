@@ -18,7 +18,15 @@
 			"request": "launch",
 			"program": "main.py",
 			"console": "integratedTerminal",
-			"args": ["--score-truss", "./minimum-truss.mat"],
+			"args": ["--score-truss"],
+		},
+		{
+			"name": "truss grid gui",
+			"type": "python",
+			"request": "launch",
+			"program": "main.py",
+			"console": "integratedTerminal",
+			"args": ["--score-truss", "gui"],
 		}
 	]
 }

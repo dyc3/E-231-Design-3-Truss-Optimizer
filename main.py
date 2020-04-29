@@ -593,16 +593,56 @@ def score_truss(truss, silent=False):
 # 		score = score_truss(truss)
 # 		print(f"truss {mode}/{subdivides} valid: {is_valid} score: {score:.1f}")
 
+np.random.seed(42)
+grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH / 2, args.grid_size_x, args.grid_size_y, hyper_connected=args.hyper_connected)
+
 if args.score_truss:
-	truss = load_truss_from_file(args.score_truss)
+	if args.score_truss == "gui":
+		import PySimpleGUI as sg
+		from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, FigureCanvasAgg
+
+		sg.theme('DarkAmber')   # Add a touch of color
+		# All the stuff inside your window.
+		layout = [  [sg.Canvas(size=(10, 5), key='canvas')],
+					[sg.Checkbox(f'member {i}') for i in range(len(grid) // 2)],
+					[sg.Checkbox(f'member {i}') for i in range(len(grid) // 2, len(grid))],
+					[sg.Button('Ok'), sg.Button('Cancel')] ]
+
+		def draw_figure(canvas, figure, loc=(0, 0)):
+			figure_canvas_agg = FigureCanvasTkAgg(figure, window['canvas'].TKCanvas)
+			figure_canvas_agg.draw()
+			figure_canvas_agg.get_tk_widget().grid(row=0, column=0)
+			return figure_canvas_agg
+
+		# Create the Window
+		window = sg.Window('Window Title', layout)
+		window.Finalize()
+
+		# Event Loop to process "events" and get the "values" of the inputs
+		while True:
+			print("loop")
+			event, values = window.read()
+			print(event, values)
+			if event in (None, 'Cancel'):   # if user closes window or clicks cancel
+				break
+			plt.clf()
+
+			truss = generate_truss_by_grid(grid, list([values[i] for i in range(len(grid))]))
+			if truss:
+				print(len(truss.element_map.values()))
+				print(2 * len(truss.node_map.values()) - 3)
+				fig = truss.show_structure(show=False)
+				fig_canvas_agg = draw_figure(window['canvas'].TKCanvas, fig)
+			else:
+				print("couldnt build truss")
+		window.close()
+	else:
+		truss = load_truss_from_file(args.score_truss)
 	print(f'valid: {is_truss_valid(truss)}')
 	print(f'score: {score_truss(truss)}')
 	if args.show_trusses:
 		truss.show_structure()
 	os._exit(0)
-
-np.random.seed(42)
-grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH / 2, args.grid_size_x, args.grid_size_y, hyper_connected=args.hyper_connected)
 
 # truss = generate_truss_by_grid(grid, ([True, True, False] * 5000)[:len(grid)])
 # truss.show_structure()

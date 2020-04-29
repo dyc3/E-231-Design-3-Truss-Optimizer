@@ -245,6 +245,7 @@ def generate_truss_grid(height, width, grid_size_x, grid_size_y, hyper_connected
 				if euclidean(point1, point2) < 1e-3:
 					continue
 				all_possible_members.append([point1, point2])
+		all_possible_members = exclude_duplicate_members(all_possible_members)
 	else:
 		def is_adjacent(a, b):
 			if a[0] == b[0]:

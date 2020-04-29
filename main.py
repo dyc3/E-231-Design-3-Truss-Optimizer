@@ -455,7 +455,7 @@ def generate_truss_by_grid(grid, enabled):
 	# assert len(all_possible_members) == len(enabled)
 	members = all_possible_members[enabled]
 	# print(f"members selected: {len(members)}")
-	members = optimize_colinear_members(members)
+	# members = optimize_colinear_members(members)
 	# mirror the members to the right side
 	members_mirror = np.copy(members)
 	members_x, members_y = members_mirror[:,:,[True, False]], members_mirror[:,:,[False, True]]

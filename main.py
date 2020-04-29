@@ -235,7 +235,7 @@ def generate_truss(subdivide_mode=None, subdivides=None):
 
 def generate_truss_grid(height, width, grid_size_x, grid_size_y, hyper_connected=False, exclude_known_useless=True):
 	all_grid_points = np.array(np.meshgrid(np.arange(0, width + 0.01, width / grid_size_x), np.arange(0, height + 0.01, height / grid_size_y))).T.reshape(-1, 2)
-	max_dist = euclidean([0, 0], [width / grid_size_x, height / grid_size_y]) + 0.01
+	max_dist = euclidean([0, 0], [width / grid_size_x, height / grid_size_y])
 	if exclude_known_useless:
 		all_grid_points = np.array(list(filter(lambda point: point[1] < (height / grid_size_y * (grid_size_y - 1)) + 0.1 or point[0] > 1, all_grid_points)))
 	all_possible_members = []
@@ -246,7 +246,13 @@ def generate_truss_grid(height, width, grid_size_x, grid_size_y, hyper_connected
 					continue
 				all_possible_members.append([point1, point2])
 	else:
-		comb = np.array(list(filter(lambda x: euclidean(all_grid_points[x[1]], all_grid_points[x[0]]) <= max_dist, combinations(range(len(all_grid_points)), 2))))
+		def is_adjacent(a, b):
+			if a[0] == b[0]:
+				return abs(a[1] - b[1]) <= height / grid_size_y
+			if a[1] == b[1]:
+				return abs(a[0] - b[0]) <= width / grid_size_x
+			return euclidean(a, b) <= max_dist
+		comb = np.array(list(filter(lambda x: is_adjacent(all_grid_points[x[1]], all_grid_points[x[0]]), combinations(range(len(all_grid_points)), 2))))
 		all_possible_members = list(map(lambda idx: [all_grid_points[idx[0]], all_grid_points[idx[1]]], comb))
 
 	# verify there are no zero length members, and no duplicate members
@@ -258,7 +264,8 @@ def generate_truss_grid(height, width, grid_size_x, grid_size_y, hyper_connected
 				count += 1
 			assert count <= 1
 
-	return np.array(all_possible_members)
+	all_possible_members = np.array(all_possible_members)
+	return all_possible_members # + valmap(np.random.rand(*all_possible_members.shape), 0, 1, -0.2, 0.2) # for debugging
 
 def are_members_equal(a, b):
 	return np.allclose(sorted(a, key=lambda p: p[0]), sorted(b, key=lambda p: p[0]))
@@ -573,7 +580,7 @@ def score_truss(truss, silent=False):
 	max_load = check_max_load(truss)
 	if not silent:
 		print(f"all members: {total_member_length} in, {material_weight:.2f} lbs, holds max load {max_load}, {num_hanging_members} hanging members")
-	return max_load / material_weight * ((total_member_length < 72) * 2 + 1)
+	return max_load / material_weight / total_member_length * ((total_member_length < 72) * 2 + 1)
 
 # for mode in ["triangle_subdivide", "radial_subdivide", "pillar_subdivide"]:
 # 	for subdivides in range(1, 5):

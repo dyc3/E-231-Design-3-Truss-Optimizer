@@ -586,6 +586,7 @@ def score_truss(truss, silent=False):
 # 	for subdivides in range(1, 5):
 # 		truss = generate_truss(mode, subdivides)
 # 		is_valid = is_truss_valid(truss)
+# 		save_truss_for_truss_analyzer(truss, f"./trusses/truss_{mode}_{subdivides}.mat")
 # 		score = score_truss(truss)
 # 		print(f"truss {mode}/{subdivides} valid: {is_valid} score: {score:.1f}")
 

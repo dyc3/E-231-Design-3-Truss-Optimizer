@@ -576,7 +576,7 @@ def score_truss(truss, silent=False):
 	material_weight = BRASS_CROSS_SECTION_AREA * total_member_length * BRASS_DENSITY
 	num_hanging_members = sum([1 for connections in truss.node_element_map.values() if len(connections) == 1])
 
-	load_node_id = truss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT])
+	load_node_id = truss.nearest_node("y", MAX_HEIGHT)
 	load_range_min, load_range_max = MIN_POSSIBLE_LOAD, MAX_POSSIBLE_LOAD
 	truss.point_load(Fy=-1, node_id=load_node_id)
 	truss.solve(max_iter=500)

@@ -54,7 +54,7 @@ BRASS_CROSS_SECTION_AREA = 0.006216 # in^2
 BRASS_DENSITY = 0.308 # lbs/in^3
 MOMENT_OF_INERTIA = 1.2968e-05
 
-JOHNSON_EULER_TRANSITION_lENGTH = 3.3 # in
+JOHNSON_EULER_TRANSITION_LENGTH = 3.3 # in
 END_CONDITION_FACTOR = 0.8 # in
 
 def dist(a, b):
@@ -581,7 +581,7 @@ def calculate_max_force(member):
 	force = -member['N']
 
 	if force > 0:
-		if member['length'] < JOHNSON_EULER_TRANSITION_lENGTH:
+		if member['length'] < JOHNSON_EULER_TRANSITION_LENGTH:
 			# perform johnson calculation
 			max_load = (
 				BRASS_CROSS_SECTION_AREA *

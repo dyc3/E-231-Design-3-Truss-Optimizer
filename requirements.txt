@@ -1,5 +1,6 @@
 anastruct==1.1.2
 cycler==0.10.0
+hyperopt==0.2.4
 kiwisolver==1.1.0
 matplotlib==3.0.3
 numpy==1.18.2

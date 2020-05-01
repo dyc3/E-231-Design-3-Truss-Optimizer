@@ -14,6 +14,7 @@ from multiprocessing import Pool
 import argparse
 from scipy.io import loadmat, savemat
 import os
+import hyperopt
 
 # trusses must span 15 inches, and there must be a connection at the top center of the truss
 # member length must not exceed 72 inches, as 2 lengths of 36 inches
@@ -36,6 +37,8 @@ parser.add_argument('--mutation-rate', type=float, default=0.008)
 parser.add_argument('--show-trusses', default=False, action='store_true')
 parser.add_argument('--disable-parallel', dest='parallel', action='store_false')
 parser.add_argument('--score-truss', type=str)
+parser.add_argument('--optimize-truss', type=str)
+parser.add_argument('--optimize-truss-iterations', type=int, default=1000)
 args = parser.parse_args()
 
 print(args)
@@ -81,6 +84,18 @@ class Truss:
 		self.nodes = []
 		self.members = []
 
+	@property
+	def total_width(self):
+		left_most = min(self.nodes, key=lambda p: p[0])
+		right_most = max(self.nodes, key=lambda p: p[0])
+		return right_most[0] - left_most[0]
+
+	@property
+	def total_height(self):
+		top_most = max(self.nodes, key=lambda p: p[1])
+		bottom_most = min(self.nodes, key=lambda p: p[1])
+		return top_most[1] - bottom_most[1]
+
 	def draw(self):
 		lines = list([list(self.nodes[idx] for idx in member) for member in self.members])
 		for line in lines:
@@ -92,8 +107,8 @@ class Truss:
 		right_most = max(self.nodes, key=lambda p: p[0])
 		top_most = max(self.nodes, key=lambda p: p[1])
 		bottom_most = min(self.nodes, key=lambda p: p[1])
-		total_width = right_most[0] - left_most[0]
-		total_height = top_most[1] - bottom_most[1]
+		total_width = self.total_width
+		total_height = self.total_height
 		lines = list([list(self.nodes[idx] for idx in member) for member in self.members])
 		total_length = sum([dist(*line) for line in lines])
 		return total_width >= MIN_WIDTH and total_height <= MAX_HEIGHT and total_length <= 72 and len(self.members) >=  2 * len(self.nodes) - 3
@@ -101,6 +116,15 @@ class Truss:
 	def calculate_member_forces(self):
 		top_most_idx = self.nodes.index(max(self.nodes, key=lambda p: p[1])) # load will be placed on this node
 		pass
+
+	def to_anastruct(self) -> SystemElements:
+		lines = list([list(self.nodes[idx] for idx in member) for member in self.members])
+		truss = SystemElements(EA=MODULUS_OF_ELASTICITY * BRASS_CROSS_SECTION_AREA, EI=MODULUS_OF_ELASTICITY * MOMENT_OF_INERTIA)
+		for line in lines:
+			truss.add_truss_element(line)
+		truss.add_support_hinged(node_id=truss.find_node_id(vertex=list(min(self.nodes, key=lambda p: p[0]))))
+		truss.add_support_hinged(node_id=truss.find_node_id(vertex=list(max(self.nodes, key=lambda p: p[0]))))
+		return truss
 
 test_truss = Truss()
 test_truss.nodes = [
@@ -484,6 +508,18 @@ def load_truss_from_file(mat_file_path):
 	data = loadmat(mat_file_path)
 	nodes = np.array(data['nodes']) - [1, 3]
 	elements = np.array(data['elements']) - 1
+	truss = Truss()
+	truss.nodes = nodes
+	truss.members = elements
+	return truss
+
+def load_truss_from_file_to_anastruct(mat_file_path):
+	"""
+	Loads a truss from the Stevens' Truss Analyzer program
+	"""
+	data = loadmat(mat_file_path)
+	nodes = np.array(data['nodes']) - [1, 3]
+	elements = np.array(data['elements']) - 1
 	truss = SystemElements(EA=MODULUS_OF_ELASTICITY * BRASS_CROSS_SECTION_AREA, EI=MODULUS_OF_ELASTICITY * MOMENT_OF_INERTIA)
 	for elementnodes in elements:
 		member = nodes[elementnodes]
@@ -594,55 +630,6 @@ def score_truss(truss, silent=False):
 # 		print(f"truss {mode}/{subdivides} valid: {is_valid} score: {score:.1f}")
 
 np.random.seed(42)
-grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH / 2, args.grid_size_x, args.grid_size_y, hyper_connected=args.hyper_connected)
-
-if args.score_truss:
-	if args.score_truss == "gui":
-		import PySimpleGUI as sg
-		from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, FigureCanvasAgg
-
-		sg.theme('DarkAmber')   # Add a touch of color
-		# All the stuff inside your window.
-		layout = [  [sg.Canvas(size=(10, 5), key='canvas')],
-					[sg.Checkbox(f'member {i}') for i in range(len(grid) // 2)],
-					[sg.Checkbox(f'member {i}') for i in range(len(grid) // 2, len(grid))],
-					[sg.Button('Ok'), sg.Button('Cancel')] ]
-
-		def draw_figure(canvas, figure, loc=(0, 0)):
-			figure_canvas_agg = FigureCanvasTkAgg(figure, window['canvas'].TKCanvas)
-			figure_canvas_agg.draw()
-			figure_canvas_agg.get_tk_widget().grid(row=0, column=0)
-			return figure_canvas_agg
-
-		# Create the Window
-		window = sg.Window('Window Title', layout)
-		window.Finalize()
-
-		# Event Loop to process "events" and get the "values" of the inputs
-		while True:
-			print("loop")
-			event, values = window.read()
-			print(event, values)
-			if event in (None, 'Cancel'):   # if user closes window or clicks cancel
-				break
-			plt.clf()
-
-			truss = generate_truss_by_grid(grid, list([values[i] for i in range(len(grid))]))
-			if truss:
-				print(len(truss.element_map.values()))
-				print(2 * len(truss.node_map.values()) - 3)
-				fig = truss.show_structure(show=False)
-				fig_canvas_agg = draw_figure(window['canvas'].TKCanvas, fig)
-			else:
-				print("couldnt build truss")
-		window.close()
-	else:
-		truss = load_truss_from_file(args.score_truss)
-	print(f'valid: {is_truss_valid(truss)}')
-	print(f'score: {score_truss(truss)}')
-	if args.show_trusses:
-		truss.show_structure()
-	os._exit(0)
 
 # truss = generate_truss_by_grid(grid, ([True, True, False] * 5000)[:len(grid)])
 # truss.show_structure()
@@ -662,14 +649,6 @@ def generate_valid_truss(grid):
 		if truss and not truss.find_node_id(vertex=[MIN_WIDTH / 2, MAX_HEIGHT]):
 			truss = None
 	return members
-
-print("generating initial population...")
-truss_population = None
-if args.parallel:
-	with Pool() as p:
-		truss_population = list(tqdm(p.imap(generate_valid_truss, [grid] * args.population_size), total=args.population_size))
-else:
-	truss_population = list(tqdm(map(generate_valid_truss, [grid] * args.population_size), total=args.population_size))
 
 def mutate(pop, mutation_rate=args.mutation_rate):
 	"""
@@ -801,6 +780,122 @@ def genetic_optimization(population):
 		population = np.array(valid_pop)
 
 	return population
+
+def get_index_of_node(nodes, targetnode):
+	for i, node in enumerate(truss.nodes):
+		if np.array_equal(node, targetnode):
+			return i
+	return -1
+
+def optimize_member_lengths(truss: Truss) -> Truss:
+	"""
+	Moves the nodes around to find the optimal lengths. Keeps the support nodes in place, and does not move the load node's x axis.
+	Uses hyperparameter optimizeation to maximize the output of the truss score
+	"""
+	truss.nodes = np.array(truss.nodes)
+	load_node_idx = get_index_of_node(truss.nodes, max(truss.nodes, key=lambda p: p[1]))
+	support_node_idxs = [
+		get_index_of_node(truss.nodes, min(truss.nodes, key=lambda p: p[0])),
+		get_index_of_node(truss.nodes, max(truss.nodes, key=lambda p: p[0])),
+	]
+	x_bounds = (0, MIN_WIDTH)
+	y_bounds = (0, MAX_HEIGHT)
+	trials = hyperopt.Trials()
+	problem_space = {}
+	for i, node in enumerate(truss.nodes):
+		if i in support_node_idxs:
+			continue
+		if i == load_node_idx:
+			# problem_space[f"{i}:1"] = hyperopt.hp.uniform(f"{i}:1", *(y_bounds[1] * 0.85, y_bounds[1]))
+			pass
+		else:
+			problem_space[f"{i}:0"] = hyperopt.hp.uniform(f"{i}:0", *x_bounds)
+			if node[1] != 0:
+				problem_space[f"{i}:1"] = hyperopt.hp.uniform(f"{i}:1", *y_bounds)
+	def truss_loss(parameters):
+		tmp_truss = Truss()
+		tmp_truss.nodes = np.zeros(truss.nodes.shape)
+		tmp_truss.members = truss.members
+		tmp_truss.nodes[load_node_idx][0] = truss.nodes[load_node_idx][0]
+		for support_idx in support_node_idxs:
+			tmp_truss.nodes[support_idx] = truss.nodes[support_idx]
+		for key, value in parameters.items():
+			node_idx, dimension_idx = map(int, key.split(":"))
+			tmp_truss.nodes[node_idx][dimension_idx] = value
+		return 1 / score_truss(tmp_truss.to_anastruct(), silent=True)
+	best = hyperopt.fmin(fn=truss_loss, space=problem_space, algo=hyperopt.tpe.suggest, trials=trials, max_evals=args.optimize_truss_iterations)
+	print(best)
+	for key, value in best.items():
+		node_idx, dimension_idx = map(int, key.split(":"))
+		truss.nodes[node_idx][dimension_idx] = value
+	return truss
+
+if args.optimize_truss:
+	truss = load_truss_from_file(args.optimize_truss)
+	truss = optimize_member_lengths(truss)
+	print(f"{score_truss(truss.to_anastruct())}")
+	if args.show_trusses:
+		truss.to_anastruct().show_structure()
+	save_truss_for_truss_analyzer(truss.to_anastruct(), args.optimize_truss.replace(".mat", "") + "_optimized.mat")
+	os._exit(0)
+
+grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH / 2, args.grid_size_x, args.grid_size_y, hyper_connected=args.hyper_connected)
+
+if args.score_truss:
+	if args.score_truss == "gui":
+		import PySimpleGUI as sg
+		from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, FigureCanvasAgg
+
+		sg.theme('DarkAmber')   # Add a touch of color
+		# All the stuff inside your window.
+		layout = [  [sg.Canvas(size=(10, 5), key='canvas')],
+					[sg.Checkbox(f'member {i}') for i in range(len(grid) // 2)],
+					[sg.Checkbox(f'member {i}') for i in range(len(grid) // 2, len(grid))],
+					[sg.Button('Ok'), sg.Button('Cancel')] ]
+
+		def draw_figure(canvas, figure, loc=(0, 0)):
+			figure_canvas_agg = FigureCanvasTkAgg(figure, window['canvas'].TKCanvas)
+			figure_canvas_agg.draw()
+			figure_canvas_agg.get_tk_widget().grid(row=0, column=0)
+			return figure_canvas_agg
+
+		# Create the Window
+		window = sg.Window('Window Title', layout)
+		window.Finalize()
+
+		# Event Loop to process "events" and get the "values" of the inputs
+		while True:
+			print("loop")
+			event, values = window.read()
+			print(event, values)
+			if event in (None, 'Cancel'):   # if user closes window or clicks cancel
+				break
+			plt.clf()
+
+			truss = generate_truss_by_grid(grid, list([values[i] for i in range(len(grid))]))
+			if truss:
+				print(len(truss.element_map.values()))
+				print(2 * len(truss.node_map.values()) - 3)
+				fig = truss.show_structure(show=False)
+				fig_canvas_agg = draw_figure(window['canvas'].TKCanvas, fig)
+			else:
+				print("couldnt build truss")
+		window.close()
+	else:
+		truss = load_truss_from_file_to_anastruct(args.score_truss)
+	print(f'valid: {is_truss_valid(truss)}')
+	print(f'score: {score_truss(truss)}')
+	if args.show_trusses:
+		truss.show_structure()
+	os._exit(0)
+
+print("generating initial population...")
+truss_population = None
+if args.parallel:
+	with Pool() as p:
+		truss_population = list(tqdm(p.imap(generate_valid_truss, [grid] * args.population_size), total=args.population_size))
+else:
+	truss_population = list(tqdm(map(generate_valid_truss, [grid] * args.population_size), total=args.population_size))
 
 for members in genetic_optimization(truss_population):
 	truss = generate_truss_by_grid(grid, members)

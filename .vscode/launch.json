@@ -27,6 +27,14 @@
 			"program": "main.py",
 			"console": "integratedTerminal",
 			"args": ["--score-truss", "gui"],
+		},
+		{
+			"name": "optimize member lengths",
+			"type": "python",
+			"request": "launch",
+			"program": "main.py",
+			"console": "integratedTerminal",
+			"args": ["--optimize-truss", "./tri-bearing.mat"],
 		}
 	]
 }

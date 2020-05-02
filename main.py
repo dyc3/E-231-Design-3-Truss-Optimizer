@@ -812,10 +812,10 @@ def optimize_member_lengths(truss: Truss) -> Truss:
 		if i in support_node_idxs:
 			continue
 		if i == load_node_idx:
-			# problem_space[f"{i}:1"] = hyperopt.hp.uniform(f"{i}:1", *(y_bounds[1] * 0.85, y_bounds[1]))
+			problem_space[f"{i}:1"] = hyperopt.hp.uniform(f"{i}:1", *(y_bounds[1] * 0.85, y_bounds[1]))
 			pass
 		else:
-			problem_space[f"{i}:0"] = hyperopt.hp.uniform(f"{i}:0", node[0] - 0.5, node[0] + 0.5)
+			# problem_space[f"{i}:0"] = hyperopt.hp.uniform(f"{i}:0", node[0] - 0.5, node[0] + 0.5)
 			if node[1] != 0:
 				problem_space[f"{i}:1"] = hyperopt.hp.uniform(f"{i}:1", *y_bounds)
 	def truss_loss(parameters):

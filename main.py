@@ -96,6 +96,10 @@ class Truss:
 		bottom_most = min(self.nodes, key=lambda p: p[1])
 		return top_most[1] - bottom_most[1]
 
+	@property
+	def top_node(self):
+		return max(truss.nodes, key=lambda p: p[1])
+
 	def draw(self):
 		lines = list([list(self.nodes[idx] for idx in member) for member in self.members])
 		for line in lines:
@@ -606,13 +610,15 @@ def check_max_load(truss):
 	loads = list(map(calculate_max_force, truss.get_element_results()))
 	return min(list(filter(lambda x: x > 0, loads)) or [0])
 
-def score_truss(truss, silent=False):
+def score_truss(truss, silent=False, load_node=None):
 	member_lengths = [element.l for element in truss.element_map.values()]
 	total_member_length = sum(member_lengths)
 	material_weight = BRASS_CROSS_SECTION_AREA * total_member_length * BRASS_DENSITY
 	num_hanging_members = sum([1 for connections in truss.node_element_map.values() if len(connections) == 1])
 
-	load_node_id = truss.nearest_node("y", MAX_HEIGHT)
+	load_node_id = truss.find_node_id(vertex=(list(load_node) if np.any(load_node) else [MIN_WIDTH / 2, MAX_HEIGHT]))
+	if not load_node_id:
+		load_node_id = truss.nearest_node("both", [MIN_WIDTH / 2, MAX_HEIGHT])
 	load_range_min, load_range_max = MIN_POSSIBLE_LOAD, MAX_POSSIBLE_LOAD
 	truss.point_load(Fy=-1, node_id=load_node_id)
 	truss.solve(max_iter=500)
@@ -799,7 +805,7 @@ def optimize_member_lengths(truss: Truss) -> Truss:
 		get_index_of_node(truss.nodes, max(truss.nodes, key=lambda p: p[0])),
 	]
 	x_bounds = (0, MIN_WIDTH)
-	y_bounds = (0, MAX_HEIGHT)
+	y_bounds = (MAX_HEIGHT * 0.1, truss.nodes[load_node_idx][1] - 0.1)
 	trials = hyperopt.Trials()
 	problem_space = {}
 	for i, node in enumerate(truss.nodes):
@@ -809,20 +815,20 @@ def optimize_member_lengths(truss: Truss) -> Truss:
 			# problem_space[f"{i}:1"] = hyperopt.hp.uniform(f"{i}:1", *(y_bounds[1] * 0.85, y_bounds[1]))
 			pass
 		else:
-			problem_space[f"{i}:0"] = hyperopt.hp.uniform(f"{i}:0", *x_bounds)
+			problem_space[f"{i}:0"] = hyperopt.hp.uniform(f"{i}:0", node[0] - 0.5, node[0] + 0.5)
 			if node[1] != 0:
 				problem_space[f"{i}:1"] = hyperopt.hp.uniform(f"{i}:1", *y_bounds)
 	def truss_loss(parameters):
 		tmp_truss = Truss()
 		tmp_truss.nodes = np.zeros(truss.nodes.shape)
 		tmp_truss.members = truss.members
-		tmp_truss.nodes[load_node_idx][0] = truss.nodes[load_node_idx][0]
+		tmp_truss.nodes[load_node_idx] = truss.nodes[load_node_idx]
 		for support_idx in support_node_idxs:
 			tmp_truss.nodes[support_idx] = truss.nodes[support_idx]
 		for key, value in parameters.items():
 			node_idx, dimension_idx = map(int, key.split(":"))
 			tmp_truss.nodes[node_idx][dimension_idx] = value
-		return 1 / score_truss(tmp_truss.to_anastruct(), silent=True)
+		return 1 / score_truss(tmp_truss.to_anastruct(), silent=True, load_node=truss.nodes[load_node_idx])
 	best = hyperopt.fmin(fn=truss_loss, space=problem_space, algo=hyperopt.tpe.suggest, trials=trials, max_evals=args.optimize_truss_iterations)
 	print(best)
 	for key, value in best.items():
@@ -833,7 +839,7 @@ def optimize_member_lengths(truss: Truss) -> Truss:
 if args.optimize_truss:
 	truss = load_truss_from_file(args.optimize_truss)
 	truss = optimize_member_lengths(truss)
-	print(f"{score_truss(truss.to_anastruct())}")
+	print(f"{score_truss(truss.to_anastruct(), load_node=truss.top_node)}")
 	if args.show_trusses:
 		truss.to_anastruct().show_structure()
 	save_truss_for_truss_analyzer(truss.to_anastruct(), args.optimize_truss.replace(".mat", "") + "_optimized.mat")
@@ -882,11 +888,12 @@ if args.score_truss:
 				print("couldnt build truss")
 		window.close()
 	else:
-		truss = load_truss_from_file_to_anastruct(args.score_truss)
-	print(f'valid: {is_truss_valid(truss)}')
-	print(f'score: {score_truss(truss)}')
+		truss = load_truss_from_file(args.score_truss)
+	ana = truss.to_anastruct()
+	print(f'valid: {is_truss_valid(ana)}')
+	print(f'score: {score_truss(ana, load_node=truss.top_node)}')
 	if args.show_trusses:
-		truss.show_structure()
+		ana.show_structure()
 	os._exit(0)
 
 print("generating initial population...")

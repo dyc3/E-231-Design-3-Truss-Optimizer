@@ -820,7 +820,7 @@ def optimize_member_lengths(truss: Truss) -> Truss:
 				problem_space[f"{i}:1"] = hyperopt.hp.uniform(f"{i}:1", *y_bounds)
 	def truss_loss(parameters):
 		tmp_truss = Truss()
-		tmp_truss.nodes = np.zeros(truss.nodes.shape)
+		tmp_truss.nodes = np.copy(truss.nodes)
 		tmp_truss.members = truss.members
 		tmp_truss.nodes[load_node_idx] = truss.nodes[load_node_idx]
 		for support_idx in support_node_idxs:
@@ -828,7 +828,7 @@ def optimize_member_lengths(truss: Truss) -> Truss:
 		for key, value in parameters.items():
 			node_idx, dimension_idx = map(int, key.split(":"))
 			tmp_truss.nodes[node_idx][dimension_idx] = value
-		return 1 / score_truss(tmp_truss.to_anastruct(), silent=True, load_node=truss.nodes[load_node_idx])
+		return 1 / score_truss(tmp_truss.to_anastruct(), silent=True, load_node=[truss.nodes[load_node_idx][0], tmp_truss.nodes[load_node_idx][1]])
 	best = hyperopt.fmin(fn=truss_loss, space=problem_space, algo=hyperopt.tpe.suggest, trials=trials, max_evals=args.optimize_truss_iterations)
 	print(best)
 	for key, value in best.items():

@@ -840,9 +840,9 @@ if args.optimize_truss:
 	truss = load_truss_from_file(args.optimize_truss)
 	truss = optimize_member_lengths(truss)
 	print(f"{score_truss(truss.to_anastruct(), load_node=truss.top_node)}")
+	save_truss_for_truss_analyzer(truss.to_anastruct(), args.optimize_truss.replace(".mat", "") + "_optimized.mat")
 	if args.show_trusses:
 		truss.to_anastruct().show_structure()
-	save_truss_for_truss_analyzer(truss.to_anastruct(), args.optimize_truss.replace(".mat", "") + "_optimized.mat")
 	os._exit(0)
 
 grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH / 2, args.grid_size_x, args.grid_size_y, hyper_connected=args.hyper_connected)

@@ -14,6 +14,7 @@ from multiprocessing import Pool
 import argparse
 from scipy.io import loadmat, savemat
 import os
+import sys
 
 # trusses must span 15 inches, and there must be a connection at the top center of the truss
 # member length must not exceed 72 inches, as 2 lengths of 36 inches
@@ -50,6 +51,7 @@ BRASS_YIELD_STRESS = 59000 # psi
 BRASS_CROSS_SECTION_AREA = 0.006216 # in^2
 BRASS_DENSITY = 0.308 # lbs/in^3
 MOMENT_OF_INERTIA = 1.2968e-05
+EI_TRUSS = 0.0001
 
 JOHNSON_EULER_TRANSITION_lENGTH = 3.3 # in
 END_CONDITION_FACTOR = 0.8 # in
@@ -120,11 +122,79 @@ test_truss.members = [
 # print("is_valid", test_truss.is_valid())
 # test_truss.draw()
 
+def get_stress(member):
+	force = -member['N']
+	if force < 0:
+		force = force * 10
+	return abs(force / BRASS_CROSS_SECTION_AREA)
+
+def check_stress_distribution(truss):
+	stresses = np.fromiter(map(get_stress, truss.get_element_results()), dtype=np.float_)
+	return np.std(stresses)
+
+def solve_truss(truss):
+	load_node_id = truss.find_node_id(vertex=[MIN_WIDTH/2, MAX_HEIGHT])
+	truss.point_load(Fy=-1, node_id=load_node_id)
+	truss.solve(max_iter=500)
+
+	return truss
+
+def show_truss(grid, enabled):
+	#enabled = eliminate_zero_force_members(grid, enabled)
+	truss = generate_truss_by_grid(grid, enabled)
+	truss.show_structure()
+
+
+def eso_optomize():
+	grid = generate_truss_grid(MAX_HEIGHT, MIN_WIDTH / 2, args.grid_size_x, args.grid_size_y, hyper_connected=True)
+	enabled = list([True for i in range(len(grid))])
+	truss = generate_truss_by_grid(grid, enabled)
+	#truss.show_structure()
+
+	truss = solve_truss(truss)
+
+	stdev = check_stress_distribution(truss)
+	max_load = check_max_load(truss)
+	print(enabled)
+
+	threshold = 0.1
+	counter = 0
+	while counter < 130 :
+		stresses = np.fromiter(map(get_stress, truss.get_element_results()), dtype=np.float_)
+		#elements = truss.get_element_result_range('ID')
+		stresses = stresses[0:int(stresses.size / 2)]
+		valid_stresses = np.ma.MaskedArray(stresses, stresses == 0)
+		min = np.ma.argmin(valid_stresses)
+
+		enabled_numpy = np.asarray(enabled)
+
+		cond = (enabled_numpy == True)
+		count = np.cumsum(cond)
+		idx = np.searchsorted(count, min+1)
+		
+		counter += 1
+		
+		enabled[idx] = False
+		truss = generate_truss_by_grid(grid, enabled)
+		truss = solve_truss(truss)
+
+		stdev = check_stress_distribution(truss)
+		max_load = check_max_load(truss)
+		#truss.show_structure()
+		print(f'\niteration: {counter}')
+		print(f'standard deviation: {stdev}')
+		print(f'max load: {max_load}')
+		save_organism_figure(np.array(enabled), max_load, counter, grid)
+
+
+	sys.exit(0)
+
+
 def generate_truss(subdivide_mode=None, subdivides=None):
 	"""
 	Randomly generate a valid truss
 	"""
-	ss = SystemElements(EA=MODULUS_OF_ELASTICITY * BRASS_CROSS_SECTION_AREA, EI=MODULUS_OF_ELASTICITY * MOMENT_OF_INERTIA)
+	ss = SystemElements(EA=MODULUS_OF_ELASTICITY * BRASS_CROSS_SECTION_AREA, EI=EI_TRUSS)
 	width = MIN_WIDTH
 	height = MAX_HEIGHT
 	if not subdivide_mode:
@@ -467,7 +537,7 @@ def generate_truss_by_grid(grid, enabled):
 	members_mirror = np.append(members_x, members_y, axis=2)
 	members = np.append(members, members_mirror, axis=0)
 	members = exclude_duplicate_members(members)
-	truss = SystemElements(EA=MODULUS_OF_ELASTICITY * BRASS_CROSS_SECTION_AREA, EI=MODULUS_OF_ELASTICITY * MOMENT_OF_INERTIA)
+	truss = SystemElements(EA=MODULUS_OF_ELASTICITY * BRASS_CROSS_SECTION_AREA, EI=EI_TRUSS)
 	for member in members:
 		truss.add_truss_element(member)
 	try:
@@ -484,7 +554,7 @@ def load_truss_from_file(mat_file_path):
 	data = loadmat(mat_file_path)
 	nodes = np.array(data['nodes']) - [1, 3]
 	elements = np.array(data['elements']) - 1
-	truss = SystemElements(EA=MODULUS_OF_ELASTICITY * BRASS_CROSS_SECTION_AREA, EI=MODULUS_OF_ELASTICITY * MOMENT_OF_INERTIA)
+	truss = SystemElements(EA=MODULUS_OF_ELASTICITY * BRASS_CROSS_SECTION_AREA, EI=EI_TRUSS)
 	for elementnodes in elements:
 		member = nodes[elementnodes]
 		truss.add_truss_element(member)
@@ -663,13 +733,6 @@ def generate_valid_truss(grid):
 			truss = None
 	return members
 
-print("generating initial population...")
-truss_population = None
-if args.parallel:
-	with Pool() as p:
-		truss_population = list(tqdm(p.imap(generate_valid_truss, [grid] * args.population_size), total=args.population_size))
-else:
-	truss_population = list(tqdm(map(generate_valid_truss, [grid] * args.population_size), total=args.population_size))
 
 def mutate(pop, mutation_rate=args.mutation_rate):
 	"""
@@ -724,8 +787,9 @@ def rank_selection(pop, fitness):
 	idx = np.random.choice(np.arange(pop.shape[0]), size=pop.shape[0], replace=True, p=rank_p / np.sum(rank_p))
 	return pop[idx]
 
-def eliminate_zero_force_members(organism):
-	organism = copy.deepcopy(organism)
+def eliminate_zero_force_members(grid, enabled):
+	#organism = copy.deepcopy(organism)
+	organism = np.array(enabled)
 	truss = generate_truss_by_grid(grid, organism)
 	if not truss:
 		return organism
@@ -735,11 +799,11 @@ def eliminate_zero_force_members(organism):
 	truss.solve()
 	member_idxs = np.where(organism)[0]
 	loads = np.array(list(map(lambda x: x["N"], truss.get_element_results())))
-	assert len(member_idxs) * 2 == len(loads)
+	#assert len(member_idxs) * 2 == len(loads)
 	loads = loads[:len(member_idxs)]
 	zero_force_idxs = member_idxs[np.where((loads == 0) | (loads == False))[0]]
 	organism[zero_force_idxs] = False
-	return organism
+	return np.ndarray.tolist(organism)
 
 name = "grid_4_6"
 
@@ -750,7 +814,7 @@ if not os.path.exists("img"):
 if not os.path.exists("img/" + name):
 	os.mkdir("img/" + name)
 
-def save_organism_figure(organism, fitness, generation, suffix=""):
+def save_organism_figure(organism, fitness, generation, grid, suffix=""):
 	truss = generate_truss_by_grid(grid, organism)
 	fig = truss.show_structure(show=False, verbosity=1)
 	plt.title(f"fitness = {round(fitness, 3)}")
@@ -801,6 +865,20 @@ def genetic_optimization(population):
 		population = np.array(valid_pop)
 
 	return population
+
+"""
+eso_optomize()
+"""
+
+print("generating initial population...")
+truss_population = None
+if args.parallel:
+	with Pool() as p:
+		truss_population = list(tqdm(p.imap(generate_valid_truss, [grid] * args.population_size), total=args.population_size))
+else:
+	truss_population = list(tqdm(map(generate_valid_truss, [grid] * args.population_size), total=args.population_size))
+
+
 
 for members in genetic_optimization(truss_population):
 	truss = generate_truss_by_grid(grid, members)
